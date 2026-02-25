@@ -9,7 +9,7 @@
 
 static const char *TAG = "PLANE_MAIN";
 
-// Helper: Maps 9.0V - 13.0V to 0-255 for a 3S LiPo
+// Helper: Maps 9.0V - 13.0V to 0-255 for a 3S LiPo, change this if you use a different battery configuration.
 uint8_t pack_3s_voltage(float voltage) {
     if (voltage < 9.0f) voltage = 9.0f;
     if (voltage > 13.0f) voltage = 13.0f;
