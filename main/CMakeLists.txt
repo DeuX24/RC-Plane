@@ -1,0 +1,13 @@
+idf_component_register(
+    SRCS 
+        "main.c"
+        "actuator_control.c"
+    INCLUDE_DIRS 
+        "."
+    REQUIRES 
+        driver 
+        mirf
+        esp_psram
+    PRIV_REQUIRES 
+        spi_flash
+)
