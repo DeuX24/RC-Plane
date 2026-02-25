@@ -1,0 +1,13 @@
+idf_component_register(
+    SRCS 
+        "main.c"
+    INCLUDE_DIRS 
+        "."
+    REQUIRES 
+        driver 
+        mirf
+        rc_protocol
+        esp_psram
+    PRIV_REQUIRES 
+        spi_flash
+)

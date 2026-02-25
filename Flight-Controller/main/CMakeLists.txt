@@ -7,6 +7,7 @@ idf_component_register(
     REQUIRES 
         driver 
         mirf
+        rc_protocol
         esp_psram
     PRIV_REQUIRES 
         spi_flash
