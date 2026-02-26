@@ -19,6 +19,10 @@ static bool link_established = false;
 static uint32_t last_recv_time = 0;
 static uint32_t last_scan_time = 0;
 
+// --- RC STATE ---
+static control_packet_t last_command = { .header = 0xA5, .status = 0, .checksum = 0 };
+static uint32_t last_usb_time = 0;
+
 // --- GPIO CONFIG ---
 #define RED_LED_GPIO      21  // Standard LED
 #define RGB_LED_GPIO      48  // Common WS2812 pin on S3 DevKits
