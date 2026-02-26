@@ -162,11 +162,16 @@ void app_main(void)
         uint8_t header;
         if (usb_serial_jtag_read_bytes(&header, 1, pdMS_TO_TICKS(10)) == 1 && header == 0xA5) 
         {
+            uint8_t usb_rx_buffer[10];
             usb_rx_buffer[0] = 0xA5;
             if (usb_serial_jtag_read_bytes(&usb_rx_buffer[1], 9, pdMS_TO_TICKS(10)) == 9) 
             {
+                // Save the valid packet to our global state
+                memcpy(&last_command, usb_rx_buffer, sizeof(control_packet_t));
+                last_usb_time = esp_log_timestamp(); // Reset the PC failsafe timer
+
                 // Forward directly to Plane on current channel
-                esp_now_send(BROADCAST_MAC, usb_rx_buffer, sizeof(control_packet_t));
+                esp_now_send(BROADCAST_MAC, (uint8_t*)&last_command, sizeof(control_packet_t));
             }
         }
     }
