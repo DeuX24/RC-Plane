@@ -9,7 +9,6 @@ idf_component_register(
         nvs_flash
         esp_netif
         lwip
-        esp_now
         driver
         esp_psram
         rc_protocol
