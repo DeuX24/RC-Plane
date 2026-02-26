@@ -67,34 +67,35 @@ void on_telem_recv(const esp_now_recv_info_t *recv_info, const uint8_t *data, in
 void handle_channel_discovery(void) {
     uint32_t now = esp_log_timestamp();
 
-    // 1. Handle Timeout: If we haven't heard from the plane in 2 seconds, start searching
+    // 1. Air Failsafe: Plane lost for 2 seconds
     if (link_established && (now - last_recv_time > 2000)) {
         link_established = false;
-        set_rgb(50, 0, 50); // PURPLE = Searching
+        set_rgb(50, 0, 50); // PURPLE
     }
 
-    // 2. Handle Scanning: Cycle channels if link is down
-    if (!link_established) {
-        if (now - last_scan_time > 200) { // Try a new channel every 200ms
+    // 2. Heartbeat & Discovery Timer (Every 200ms)
+    if (now - last_scan_time > 200) { 
+        if (!link_established) {
             current_channel++;
-            if (current_channel > 13) current_channel = 1; // Standard Sweden range
-            
+            if (current_channel > 13) current_channel = 1; 
             esp_wifi_set_channel(current_channel, WIFI_SECOND_CHAN_NONE);
-            last_scan_time = now;
-            
-            // Construct a "Ping" packet to trigger a response from the plane
-            control_packet_t ping = { 
-                .header = 0xA5, 
-                .status = 0 // Disarmed ping
-            };
-            
-            // Simple XOR Checksum for the ping
-            uint8_t *p = (uint8_t*)&ping;
-            ping.checksum = 0;
-            for (int i = 1; i < 9; i++) ping.checksum ^= p[i];
-            
-            esp_now_send(BROADCAST_MAC, (uint8_t*)&ping, sizeof(ping));
         }
+        last_scan_time = now;
+        
+        // PC FAILSAFE
+        // If the USB hasn't sent a command in 500ms, force a disarm to prevent flyaways
+        if (now - last_usb_time > 500) {
+            last_command.status = 0;
+            last_command.throttle = 0;
+            
+            // Recompute checksum for the failsafe packet
+            uint8_t *p = (uint8_t*)&last_command;
+            last_command.checksum = 0;
+            for (int i = 1; i < 9; i++) last_command.checksum ^= p[i];
+        }
+        
+        // Send the last known command (or the disarmed command if PC timed out)
+        esp_now_send(BROADCAST_MAC, (uint8_t*)&last_command, sizeof(control_packet_t));
     }
 }
 
