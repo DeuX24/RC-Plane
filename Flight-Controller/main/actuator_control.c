@@ -36,10 +36,10 @@ static uint32_t map_value(long x, long in_min, long in_max, long out_min, long o
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
 
-// Helper to set up a single channel
-static void setup_mcpwm_channel(mcpwm_timer_handle_t timer, int gpio_num, mcpwm_cmpr_handle_t *cmpr_handle_out, uint32_t initial_us) {
+// Helper to set up a channel
+static void setup_mcpwm_channel(int group_id, mcpwm_timer_handle_t timer, int gpio_num, mcpwm_cmpr_handle_t *cmpr_handle_out, uint32_t initial_us) {
     mcpwm_oper_handle_t oper = NULL;
-    mcpwm_operator_config_t oper_config = { .group_id = 0 };
+    mcpwm_operator_config_t oper_config = { .group_id = group_id }; 
     ESP_ERROR_CHECK(mcpwm_new_operator(&oper_config, &oper));
     ESP_ERROR_CHECK(mcpwm_operator_connect_timer(oper, timer));
 
@@ -60,28 +60,48 @@ static void setup_mcpwm_channel(mcpwm_timer_handle_t timer, int gpio_num, mcpwm_
 
 void actuators_init(void) {
     ESP_LOGI(TAG, "Initializing 50Hz MCPWM Timer for Actuators...");
-    mcpwm_timer_handle_t timer = NULL;
-    mcpwm_timer_config_t timer_config = {
+
+    // --- TIMER 0 (For Group 0) ---
+    mcpwm_timer_handle_t timer0 = NULL;
+    mcpwm_timer_config_t timer_config0 = {
         .group_id = 0,
         .clk_src = MCPWM_TIMER_CLK_SRC_DEFAULT,
         .resolution_hz = 1000000, // 1us tick
         .period_ticks = 20000,    // 20ms period (50Hz)
         .count_mode = MCPWM_TIMER_COUNT_MODE_UP,
     };
-    ESP_ERROR_CHECK(mcpwm_new_timer(&timer_config, &timer));
+    ESP_ERROR_CHECK(mcpwm_new_timer(&timer_config0, &timer0));
 
-    // Setup all 4 channels on the same timer
-    setup_mcpwm_channel(timer, PIN_SERVO_ELEVATOR, &cmpr_pitch, SERVO_NEUTRAL_US);
-    setup_mcpwm_channel(timer, PIN_SERVO_RUDDER, &cmpr_yaw, SERVO_NEUTRAL_US);
+    // --- TIMER 1 (For Group 1) ---
+    mcpwm_timer_handle_t timer1 = NULL;
+    mcpwm_timer_config_t timer_config1 = {
+        .group_id = 1,
+        .clk_src = MCPWM_TIMER_CLK_SRC_DEFAULT,
+        .resolution_hz = 1000000, 
+        .period_ticks = 20000,    
+        .count_mode = MCPWM_TIMER_COUNT_MODE_UP,
+    };
+    ESP_ERROR_CHECK(mcpwm_new_timer(&timer_config1, &timer1));
 
-    setup_mcpwm_channel(timer, PIN_SERVO_LEFT_AILERON, &cmpr_left_aileron, SERVO_NEUTRAL_US);
-    setup_mcpwm_channel(timer, PIN_SERVO_RIGHT_AILERON, &cmpr_right_aileron, SERVO_NEUTRAL_US);
-    
+    // Setup 
+    // Allocate 2 channels to Group 0 (Tail surfaces)
+    setup_mcpwm_channel(0, timer0, PIN_SERVO_ELEVATOR, &cmpr_pitch, SERVO_NEUTRAL_US);
+    setup_mcpwm_channel(0, timer0, PIN_SERVO_RUDDER, &cmpr_yaw, SERVO_NEUTRAL_US);
+
+    // Allocate 3 channels to Group 1 (Wing surfaces & Throttle)
+    setup_mcpwm_channel(1, timer1, PIN_SERVO_LEFT_AILERON, &cmpr_left_aileron, SERVO_NEUTRAL_US);
+    setup_mcpwm_channel(1, timer1, PIN_SERVO_RIGHT_AILERON, &cmpr_right_aileron, SERVO_NEUTRAL_US);
     // Safety: Initialize throttle to lowest setting (1000us) so the ESC doesn't spin the motor
-    setup_mcpwm_channel(timer, PIN_MOTOR_ESC, &cmpr_throttle, ESC_MIN_US);
+    setup_mcpwm_channel(1, timer1, PIN_MOTOR_ESC, &cmpr_throttle, ESC_MIN_US);
 
-    ESP_ERROR_CHECK(mcpwm_timer_enable(timer));
-    ESP_ERROR_CHECK(mcpwm_timer_start_stop(timer, MCPWM_TIMER_START_NO_STOP));
+    // Enable and Start Timer 0
+    ESP_ERROR_CHECK(mcpwm_timer_enable(timer0));
+    ESP_ERROR_CHECK(mcpwm_timer_start_stop(timer0, MCPWM_TIMER_START_NO_STOP));
+    
+    // Enable and Start Timer 1
+    ESP_ERROR_CHECK(mcpwm_timer_enable(timer1));
+    ESP_ERROR_CHECK(mcpwm_timer_start_stop(timer1, MCPWM_TIMER_START_NO_STOP));
+    
     ESP_LOGI(TAG, "Actuators Initialized Successfully.");
 }
 

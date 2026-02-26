@@ -2,13 +2,18 @@ idf_component_register(
     SRCS 
         "main.c"
         "actuator_control.c"
+        "udp_logger.c"
     INCLUDE_DIRS 
         "."
     REQUIRES 
         driver 
-        mirf
         rc_protocol
         esp_psram
+        nvs_flash
+        esp_now
+        esp_wifi
+        esp_netif
+        lwip
     PRIV_REQUIRES 
         spi_flash
 )

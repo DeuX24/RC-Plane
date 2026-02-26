@@ -28,13 +28,8 @@ typedef struct __attribute__((packed)) {
 } telemetry_packet_t;
 #pragma pack(pop)
 
-// --- NRF24 RADIO SETTINGS ---
-#define NRF24_CHANNEL      76
-#define NRF24_PAYLOAD_SIZE 10
-#define NRF24_DATA_RATE    2    // 0 = 1Mbps, 1 = 2Mbps, 2 = 250Kbps
-#define NRF24_PA_LEVEL     3    // 3 = PA_MAX
-
-// Shared TX/RX Address (5 bytes)
-static const uint8_t NRF24_ADDRESS[5] = {0x54, 0x53, 0x44, 0x53, 0xE7};
+// ESP-NOW uses MAC addresses for pairing. 
+// You can use the broadcast address for testing:
+static const uint8_t BROADCAST_MAC[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 #endif

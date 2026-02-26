@@ -5,9 +5,13 @@ idf_component_register(
         "."
     REQUIRES 
         driver 
-        mirf
         rc_protocol
         esp_psram
+        esp_now
+        esp_wifi
+        nvs_flash
+        esp_netif
+        lwip
     PRIV_REQUIRES 
         spi_flash
 )
