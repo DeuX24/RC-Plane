@@ -61,15 +61,17 @@ extern "C" bool radio_receive_command(control_packet_t* cmd) {
     return (state == RADIOLIB_ERR_NONE);
 }
 
-extern "C" bool radio_transmit_telemetry(telemetry_packet_t* telem) {
-    if (!radio) return false; // Safety check
-    int state = radio->transmit((uint8_t*)telem, sizeof(telemetry_packet_t));
+extern "C" bool radio_transmit_command(control_packet_t* cmd) {
+    if (!radio) return false; 
+    // Explicitly add '0' as the 3rd argument (Dummy Address)
+    int state = radio->transmit((uint8_t*)cmd, sizeof(control_packet_t), 0);
     return (state == RADIOLIB_ERR_NONE);
 }
 
-extern "C" bool radio_transmit_command(control_packet_t* cmd) {
-    if (!radio) return false;
-    int state = radio->transmit((uint8_t*)cmd, sizeof(control_packet_t));
+extern "C" bool radio_transmit_telemetry(telemetry_packet_t* telem) {
+    if (!radio) return false; 
+    // Explicitly add '0' as the 3rd argument (Dummy Address)
+    int state = radio->transmit((uint8_t*)telem, sizeof(telemetry_packet_t), 0);
     return (state == RADIOLIB_ERR_NONE);
 }
 
