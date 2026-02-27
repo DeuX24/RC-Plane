@@ -5,4 +5,6 @@ idf_component_register(
         "include"
     REQUIRES 
         rc_protocol   # It needs access to your shared structs
+        driver
+        esp_timer
 )
