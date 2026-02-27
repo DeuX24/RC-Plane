@@ -37,12 +37,12 @@ void init() {
 
     // Define the specific wiring for the Remote Controller
     radio_config_t rc_pins = {
-        .spi_sck = 12,
+        .spi_sck = 11,    // Change these to your actual Remote wiring!
         .spi_miso = 13,
-        .spi_mosi = 11,
-        .radio_csn = 5,
-        .radio_irq = 6,
-        .radio_ce_rst = 4,
+        .spi_mosi = 12,
+        .radio_csn = 10,
+        .radio_irq = 14,
+        .radio_ce_rst = 9,
         .radio_busy = -1   
     };
 
@@ -62,7 +62,7 @@ void app_main(void) {
     set_rgb(50, 0, 50); // PURPLE = Searching for Plane
 
     // Silence logging (except errors) so the serial port is 100% clean for the GUI
-    esp_log_level_set("*", ESP_LOG_ERROR);
+    // esp_log_level_set("*", ESP_LOG_ERROR);
 
     control_packet_t last_command = { .header = 0xA5, .status = 0, .throttle = 0 };
     telemetry_packet_t telem_in = { 0 };
@@ -98,7 +98,7 @@ void app_main(void) {
 
         // 3. Transmit the Command (Heartbeat)
         if (radio_transmit_command(&last_command)) {
-            
+            set_rgb(0, 50, 50);
             // 4. Instantly check for the Plane's telemetry reply
             if (radio_receive_telemetry(&telem_in)) {
                 if (telem_in.header == 0x5A) {
@@ -113,7 +113,7 @@ void app_main(void) {
 
         // 5. Plane Failsafe: Light turns Purple if Plane drops out of sky
         if (now - last_telem_time > 1000) {
-            set_rgb(50, 0, 50); // PURPLE = Link Lost
+            //set_rgb(50, 0, 50); // Purple = Link Lost
         }
 
         // Run the heartbeat loop at 50Hz (every 20ms)

@@ -3,47 +3,42 @@
 #include "EspHal.h"
 #include "esp_log.h"
 
-static const char *TAG = "RADIO_LINK";
+static const char *TAG = "RADIO_DEBUG";
 
 // ==========================================
 // 1. CHOOSE YOUR RADIO MODULE HERE
 // ==========================================
 #define USE_NRF24
-//#define USE_SX1281
 // ==========================================
 
-// Create global pointers, but don't define the pins yet
 EspHal* hal = nullptr;
 
 #if defined(USE_NRF24)
     nRF24* radio = nullptr;
     uint8_t radio_address[5] = {0x12, 0x34, 0x56, 0x78, 0x9A};
-#elif defined(USE_SX1281)
-    SX1281* radio = nullptr;
 #endif
 
 extern "C" bool radio_init(radio_config_t* config) {
     int state = RADIOLIB_ERR_NONE;
 
-    // 1. Dynamically create the HAL using the pins passed from main.c
     hal = new EspHal(config->spi_sck, config->spi_miso, config->spi_mosi, SPI2_HOST);
 
-    // 2. Dynamically create the Radio module
 #if defined(USE_NRF24)
     Module* mod = new Module(hal, config->radio_csn, config->radio_irq, config->radio_ce_rst);
     radio = new nRF24(mod);
     
     state = radio->begin();
     if (state == RADIOLIB_ERR_NONE) {
+        // --- STABILIZATION SETTINGS FOR PA+LNA ---
+        radio->setBitRate(250.0f);      // 250kbps = Best range/stability
+        radio->setOutputPower(-12);    // Lower power to prevent blinding at close range
+
+        radio->setAutoAck(false);
+        
         radio->setReceivePipe(0, radio_address);
         radio->setTransmitPipe(radio_address);
+        ESP_LOGI(TAG, "nRF24 Configured: 250kbps, -12dBm Power.");
     }
-#elif defined(USE_SX1281)
-    Module* mod = new Module(hal, config->radio_csn, config->radio_irq, config->radio_ce_rst, config->radio_busy);
-    radio = new SX1281(mod);
-    
-    // Initialize SX1281 in LoRa mode for maximum 2.4GHz range
-    state = radio->begin(2450.0, 812.5, 7, 5, 10, 0); 
 #endif
 
     if (state == RADIOLIB_ERR_NONE) {
@@ -56,27 +51,42 @@ extern "C" bool radio_init(radio_config_t* config) {
 }
 
 extern "C" bool radio_receive_command(control_packet_t* cmd) {
-    if (!radio) return false; // Safety check
+    if (!radio) return false;
     int state = radio->receive((uint8_t*)cmd, sizeof(control_packet_t));
+    
+    // Only log if something other than "No packet" (timeout) happens
+    if (state != RADIOLIB_ERR_NONE && state != RADIOLIB_ERR_RX_TIMEOUT) {
+        ESP_LOGW(TAG, "Receive Command Failed, code %d", state);
+    }
     return (state == RADIOLIB_ERR_NONE);
 }
 
 extern "C" bool radio_transmit_command(control_packet_t* cmd) {
-    if (!radio) return false; 
-    // Explicitly add '0' as the 3rd argument (Dummy Address)
+    if (!radio) return false;
     int state = radio->transmit((uint8_t*)cmd, sizeof(control_packet_t), 0);
+    
+    if (state != RADIOLIB_ERR_NONE) {
+        ESP_LOGE(TAG, "Transmit Command Failed! Code: %d", state);
+    }
     return (state == RADIOLIB_ERR_NONE);
 }
 
 extern "C" bool radio_transmit_telemetry(telemetry_packet_t* telem) {
-    if (!radio) return false; 
-    // Explicitly add '0' as the 3rd argument (Dummy Address)
+    if (!radio) return false;
     int state = radio->transmit((uint8_t*)telem, sizeof(telemetry_packet_t), 0);
+    
+    if (state != RADIOLIB_ERR_NONE) {
+        ESP_LOGE(TAG, "Transmit Telemetry Failed! Code: %d", state);
+    }
     return (state == RADIOLIB_ERR_NONE);
 }
 
 extern "C" bool radio_receive_telemetry(telemetry_packet_t* telem) {
     if (!radio) return false;
     int state = radio->receive((uint8_t*)telem, sizeof(telemetry_packet_t));
+    
+    if (state != RADIOLIB_ERR_NONE && state != RADIOLIB_ERR_RX_TIMEOUT) {
+        ESP_LOGW(TAG, "Receive Telemetry Failed, code %d", state);
+    }
     return (state == RADIOLIB_ERR_NONE);
 }
