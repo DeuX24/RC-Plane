@@ -40,7 +40,7 @@ void app_main(void)
     init_rgb();
     set_rgb(50, 0, 0); // RED = Booting
 
-    init_wifi_and_udp_logger("Hos Therese IoT", "S7jodi4n", "192.168.2.96", 3333);
+    // init_wifi_and_udp_logger("Hos Therese IoT", "S7jodi4n", "192.168.2.96", 3333);
 
     actuators_init();
 
@@ -89,6 +89,8 @@ void app_main(void)
                 } else {
                     actuator_set_throttle(0); // Disarmed failsafe
                 }
+                printf("Received command: Throttle=%d, Yaw=%d, Pitch=%d, Roll=%d, Status=%d\n", 
+                    cmd_in.throttle, cmd_in.yaw, cmd_in.pitch, cmd_in.roll, cmd_in.status);
 
                 // 3. Update and send the Telemetry reply immediately
                 telem_out.header = 0x5A;

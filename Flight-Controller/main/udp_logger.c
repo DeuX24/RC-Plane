@@ -21,12 +21,21 @@ static EventGroupHandle_t s_wifi_event_group;
 
 // Intercepts ESP_LOG statements
 int udp_logging_vprintf(const char *fmt, va_list args) {
-    char buffer[256]; 
-    int len = vsnprintf(buffer, sizeof(buffer), fmt, args);
+    char buffer[512]; // Increased to 512 to handle long error paths/color codes
+    
+    // Create a copy of the arguments for the first use
+    va_list args_copy;
+    va_copy(args_copy, args);
+    int len = vsnprintf(buffer, sizeof(buffer), fmt, args_copy);
+    va_end(args_copy); // Always clean up the copy
     
     if (udp_socket >= 0 && len > 0) {
-        sendto(udp_socket, buffer, len, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
+        // Use the length returned by vsnprintf, capped at buffer size
+        int send_len = (len >= sizeof(buffer)) ? sizeof(buffer) - 1 : len;
+        sendto(udp_socket, buffer, send_len, 0, (struct sockaddr *)&dest_addr, sizeof(dest_addr));
     }
+
+    // Now the original 'args' is still fresh for the standard vprintf
     return vprintf(fmt, args);
 }
 
