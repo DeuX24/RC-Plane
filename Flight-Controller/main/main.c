@@ -36,7 +36,7 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Plane Receiver Booting...");
 
-    if (!radio_init()) {
+    if (!radio_init(&fc_pins)) {
         ESP_LOGE(TAG, "Radio failed to initialize!");
         while(1) { vTaskDelay(10); } // Halt
     }
