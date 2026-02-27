@@ -10,7 +10,6 @@ idf_component_register(
         rc_protocol
         esp_psram
         nvs_flash
-        esp_now
         esp_wifi
         esp_netif
         lwip
