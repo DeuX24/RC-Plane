@@ -66,3 +66,15 @@ extern "C" bool radio_transmit_telemetry(telemetry_packet_t* telem) {
     int state = radio->transmit((uint8_t*)telem, sizeof(telemetry_packet_t));
     return (state == RADIOLIB_ERR_NONE);
 }
+
+extern "C" bool radio_transmit_command(control_packet_t* cmd) {
+    if (!radio) return false;
+    int state = radio->transmit((uint8_t*)cmd, sizeof(control_packet_t));
+    return (state == RADIOLIB_ERR_NONE);
+}
+
+extern "C" bool radio_receive_telemetry(telemetry_packet_t* telem) {
+    if (!radio) return false;
+    int state = radio->receive((uint8_t*)telem, sizeof(telemetry_packet_t));
+    return (state == RADIOLIB_ERR_NONE);
+}
