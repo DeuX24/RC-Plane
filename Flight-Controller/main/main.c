@@ -94,9 +94,9 @@ void app_main(void)
                 telem_out.header = 0x5A;
                 telem_out.voltage = 12.4; // Replace with actual ADC read later
                 telem_out.link_quality = 100;
-                telem_out.pitch = cmd_in.pitch / 255.0f * 90.0f; // Mock telemetry
-                telem_out.roll = cmd_in.roll / 255.0f * 90.0f;
-                telem_out.yaw = cmd_in.yaw / 255.0f * 90.0f;
+                telem_out.pitch = (int8_t)((cmd_in.pitch / 32768.0f) * 90.0f); // Map -32768 to 32767 range to -90 to 90 degrees. Mock telemetry
+                telem_out.roll  = (int8_t)((cmd_in.roll / 32768.0f) * 90.0f);
+                telem_out.yaw   = (int8_t)((cmd_in.yaw / 32768.0f) * 90.0f);
 
                 radio_transmit_telemetry(&telem_out);
             }
