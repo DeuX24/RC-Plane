@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-// PC -> S3 (Controller) -> S3 (Plane) - 10 Bytes Total
+// PC -> S3 (Controller) -> S3 (Plane) - 9 Bytes Total
 #pragma pack(push, 1)
 typedef struct __attribute__((packed)) {
   uint8_t header;   // 0xA5
@@ -12,7 +12,6 @@ typedef struct __attribute__((packed)) {
   int16_t pitch;
   int16_t roll;
   uint8_t status;   // 0 = Disarmed, 1 = Armed
-  uint8_t checksum; // XOR of all previous bytes
 } control_packet_t;
 #pragma pack(pop)
 
@@ -27,9 +26,5 @@ typedef struct __attribute__((packed)) {
   int8_t yaw;           // -90 to +90 degrees
 } telemetry_packet_t;
 #pragma pack(pop)
-
-// ESP-NOW uses MAC addresses for pairing. 
-// You can use the broadcast address for testing:
-static const uint8_t BROADCAST_MAC[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 #endif
