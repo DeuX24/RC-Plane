@@ -24,39 +24,43 @@ void app_main(void)
 
     actuators_init();
 
-    ESP_LOGI(TAG, "Plane Receiver Online via SX1281 Radio. Listening for control packets...");
+    ESP_LOGI(TAG, "Plane Receiver Booting...");
 
     if (!radio_init()) {
         ESP_LOGE(TAG, "Radio failed to initialize!");
         while(1) { vTaskDelay(10); } // Halt
     }
 
+    ESP_LOGI(TAG, "Radio Online. Listening for control packets...");
+
     control_packet_t cmd_in = {0};
     telemetry_packet_t telem_out = {0};
 
     while (1) {
-        // This function will sit and wait until a packet arrives.
-        // Once a valid 0xA5 command arrives, it instantly transmits the telemetry reply.
-        if (radio_listen_and_reply(&cmd_in, &telem_out)) {
+        // 1. Actively listen for an incoming command
+        if (radio_receive_command(&cmd_in)) {
             
-            // 1. Apply the commands we just received
-            if (cmd_in.status == 1) { // Armed
-                actuator_set_throttle(cmd_in.throttle);
-                actuator_set_pitch(cmd_in.pitch);
-                actuator_set_roll(cmd_in.roll);
-                actuator_set_yaw(cmd_in.yaw);
-            } else {
-                actuator_set_throttle(0); // Disarmed failsafe
-            }
+            if (cmd_in.header == 0xA5) {
+                // 2. Apply the commands we just received
+                if (cmd_in.status == 1) { // Armed
+                    actuator_set_throttle(cmd_in.throttle);
+                    actuator_set_pitch(cmd_in.pitch);
+                    actuator_set_roll(cmd_in.roll);
+                    actuator_set_yaw(cmd_in.yaw);
+                } else {
+                    actuator_set_throttle(0); // Disarmed failsafe
+                }
 
-            // 2. Update the telemetry payload for the NEXT reply
-            // (e.g., read the battery ADC here)
-            telem_out.header = 0x5A;
-            telem_out.voltage = 12.4; // Replace with actual ADC read
-            telem_out.link_quality = 100;
-            telem_out.pitch = cmd_in.pitch / 256.0f * 90.0f; // Mock telemetry: Echo back the command as actual orientation
-            telem_out.roll = cmd_in.roll / 256.0f * 90.0f;
-            telem_out.yaw = cmd_in.yaw / 256.0f * 90.0f;
+                // 3. Update and send the Telemetry reply immediately
+                telem_out.header = 0x5A;
+                telem_out.voltage = 12.4; // Replace with actual ADC read later
+                telem_out.link_quality = 100;
+                telem_out.pitch = cmd_in.pitch / 256.0f * 90.0f; // Mock telemetry
+                telem_out.roll = cmd_in.roll / 256.0f * 90.0f;
+                telem_out.yaw = cmd_in.yaw / 256.0f * 90.0f;
+
+                radio_transmit_telemetry(&telem_out);
+            }
         }
 
         // Small yield to prevent watchdog resets
