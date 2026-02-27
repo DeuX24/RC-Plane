@@ -12,38 +12,38 @@ static const char *TAG = "RADIO_LINK";
 //#define USE_SX1281
 // ==========================================
 
-// --- SHARED SPI PINS ---
-#define SPI_SCK  12
-#define SPI_MISO 13
-#define SPI_MOSI 11
-#define RADIO_CSN 10
-#define RADIO_IRQ 2
-
-EspHal* hal = new EspHal(SPI_SCK, SPI_MISO, SPI_MOSI, SPI2_HOST);
+// Create global pointers, but don't define the pins yet
+EspHal* hal = nullptr;
 
 #if defined(USE_NRF24)
-    #define RADIO_CE 3
-    nRF24 radio = new Module(hal, RADIO_CSN, RADIO_IRQ, RADIO_CE);
+    nRF24* radio = nullptr;
     uint8_t radio_address[5] = {0x12, 0x34, 0x56, 0x78, 0x9A};
-
 #elif defined(USE_SX1281)
-    #define RADIO_RST  3
-    #define RADIO_BUSY 4
-    SX1281 radio = new Module(hal, RADIO_CSN, RADIO_IRQ, RADIO_RST, RADIO_BUSY);
+    SX1281* radio = nullptr;
 #endif
 
-extern "C" bool radio_init(void) {
+extern "C" bool radio_init(radio_config_t* config) {
     int state = RADIOLIB_ERR_NONE;
 
+    // 1. Dynamically create the HAL using the pins passed from main.c
+    hal = new EspHal(config->spi_sck, config->spi_miso, config->spi_mosi, SPI2_HOST);
+
+    // 2. Dynamically create the Radio module
 #if defined(USE_NRF24)
-    state = radio.begin();
+    Module* mod = new Module(hal, config->radio_csn, config->radio_irq, config->radio_ce_rst);
+    radio = new nRF24(mod);
+    
+    state = radio->begin();
     if (state == RADIOLIB_ERR_NONE) {
-        radio.setReceivePipe(0, radio_address);
-        radio.setTransmitPipe(radio_address);
+        radio->setReceivePipe(0, radio_address);
+        radio->setTransmitPipe(radio_address);
     }
 #elif defined(USE_SX1281)
+    Module* mod = new Module(hal, config->radio_csn, config->radio_irq, config->radio_ce_rst, config->radio_busy);
+    radio = new SX1281(mod);
+    
     // Initialize SX1281 in LoRa mode for maximum 2.4GHz range
-    state = radio.begin(2450.0, 812.5, 7, 5, 10, 0); 
+    state = radio->begin(2450.0, 812.5, 7, 5, 10, 0); 
 #endif
 
     if (state == RADIOLIB_ERR_NONE) {
@@ -56,11 +56,13 @@ extern "C" bool radio_init(void) {
 }
 
 extern "C" bool radio_receive_command(control_packet_t* cmd) {
-    int state = radio.receive((uint8_t*)cmd, sizeof(control_packet_t));
+    if (!radio) return false; // Safety check
+    int state = radio->receive((uint8_t*)cmd, sizeof(control_packet_t));
     return (state == RADIOLIB_ERR_NONE);
 }
 
 extern "C" bool radio_transmit_telemetry(telemetry_packet_t* telem) {
-    int state = radio.transmit((uint8_t*)telem, sizeof(telemetry_packet_t));
+    if (!radio) return false; // Safety check
+    int state = radio->transmit((uint8_t*)telem, sizeof(telemetry_packet_t));
     return (state == RADIOLIB_ERR_NONE);
 }

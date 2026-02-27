@@ -14,6 +14,7 @@ idf_component_register(
         esp_wifi
         esp_netif
         lwip
+        radio_link
     PRIV_REQUIRES 
         spi_flash
 )
