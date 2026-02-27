@@ -37,12 +37,12 @@ void init() {
 
     // Define the specific wiring for the Remote Controller
     radio_config_t rc_pins = {
-        .spi_sck = 11,    // Change these to your actual Remote wiring!
+        .spi_sck = 12,
         .spi_miso = 13,
-        .spi_mosi = 12,
-        .radio_csn = 10,
-        .radio_irq = 14,
-        .radio_ce_rst = 9,
+        .spi_mosi = 11,
+        .radio_csn = 5,
+        .radio_irq = 6,
+        .radio_ce_rst = 4,
         .radio_busy = -1   
     };
 
