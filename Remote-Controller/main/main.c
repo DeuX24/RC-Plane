@@ -23,11 +23,10 @@ void set_rgb(uint8_t r, uint8_t g, uint8_t b) {
     led_strip_refresh(led_strip);
 }
 
-void app_main(void) {
+void init() {
+
     init_rgb();
     set_rgb(50, 0, 0); // RED = Booting
-
-    ESP_LOGI(TAG, "Remote Controller Booting...");
 
     // Configure the USB Serial port to read your C# GUI
     usb_serial_jtag_driver_config_t usb_config = {
@@ -51,6 +50,13 @@ void app_main(void) {
         ESP_LOGE(TAG, "Radio failed to initialize!");
         while(1) { vTaskDelay(10); } 
     }
+}
+
+void app_main(void) {
+
+    ESP_LOGI(TAG, "Remote Controller Booting...");
+    
+    init();
 
     ESP_LOGI(TAG, "Radio Online. Starting Heartbeat Loop...");
     set_rgb(50, 0, 50); // PURPLE = Searching for Plane
@@ -60,6 +66,12 @@ void app_main(void) {
     
     uint32_t last_usb_time = 0;
     uint32_t last_telem_time = 0;
+
+    // Initialize the Wake Time variable right BEFORE the loop starts
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    
+    // Define exact target loop time (20ms)
+    const TickType_t xTotalCyclePeriod = pdMS_TO_TICKS(20);
 
     while (1) {
         uint32_t now = esp_log_timestamp();
@@ -102,6 +114,6 @@ void app_main(void) {
         }
 
         // Run the heartbeat loop at 50Hz (every 20ms)
-        vTaskDelay(pdMS_TO_TICKS(20)); 
+        vTaskDelayUntil(&xLastWakeTime, xTotalCyclePeriod);    
     }
 }
