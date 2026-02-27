@@ -4,14 +4,14 @@ idf_component_register(
     INCLUDE_DIRS 
         "."
     REQUIRES 
-        driver 
-        rc_protocol
-        esp_psram
-        esp_now
         esp_wifi
+        esp_event
         nvs_flash
         esp_netif
         lwip
+        driver
+        esp_psram
+        rc_protocol
     PRIV_REQUIRES 
         spi_flash
 )
