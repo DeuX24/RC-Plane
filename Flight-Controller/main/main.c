@@ -24,6 +24,16 @@ void app_main(void)
 
     actuators_init();
 
+    radio_config_t fc_pins = {
+        .spi_sck = 12,
+        .spi_miso = 13,
+        .spi_mosi = 11,
+        .radio_csn = 10,
+        .radio_irq = 2,
+        .radio_ce_rst = 3,
+        .radio_busy = 4  // Ignored by the wrapper if using nRF24, but good to set
+    };
+
     ESP_LOGI(TAG, "Plane Receiver Booting...");
 
     if (!radio_init()) {
