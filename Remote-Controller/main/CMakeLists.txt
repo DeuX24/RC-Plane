@@ -12,6 +12,7 @@ idf_component_register(
         driver
         esp_psram
         rc_protocol
+        radio_link
     PRIV_REQUIRES 
         spi_flash
 )
