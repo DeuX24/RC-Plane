@@ -3,7 +3,6 @@ idf_component_register(
         "main.c"
         "actuator_control.c"
         "udp_logger.c"
-        "radio_link.cpp"
     INCLUDE_DIRS 
         "."
     REQUIRES 
