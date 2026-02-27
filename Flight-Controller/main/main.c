@@ -48,10 +48,10 @@ void app_main(void)
         .spi_sck = 12,
         .spi_miso = 13,
         .spi_mosi = 11,
-        .radio_csn = 10,
-        .radio_irq = 2,
-        .radio_ce_rst = 3,
-        .radio_busy = 4  // Ignored by the wrapper if using nRF24, but good to set
+        .radio_csn = 5,
+        .radio_irq = 6,
+        .radio_ce_rst = 4,
+        .radio_busy = -1  // Ignored by the wrapper if using nRF24, but good to set
     };
 
     ESP_LOGI(TAG, "Plane Receiver Booting...");
