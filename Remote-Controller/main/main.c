@@ -61,7 +61,10 @@ void app_main(void) {
     ESP_LOGI(TAG, "Radio Online. Starting Heartbeat Loop...");
     set_rgb(50, 0, 50); // PURPLE = Searching for Plane
 
-    control_packet_t last_command = { .header = 0xA5, .status = 0 };
+    // Silence logging (except errors) so the serial port is 100% clean for the GUI
+    esp_log_level_set("*", ESP_LOG_ERROR);
+
+    control_packet_t last_command = { .header = 0xA5, .status = 0, .throttle = 0 };
     telemetry_packet_t telem_in = { 0 };
     
     uint32_t last_usb_time = 0;
