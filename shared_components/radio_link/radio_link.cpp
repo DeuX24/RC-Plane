@@ -24,7 +24,8 @@ extern "C" bool radio_init(radio_config_t* config) {
     hal = new EspHal(config->spi_sck, config->spi_miso, config->spi_mosi, SPI2_HOST);
 
 #if defined(USE_NRF24)
-    Module* mod = new Module(hal, config->radio_csn, config->radio_irq, config->radio_ce_rst);
+    // Module* mod = new Module(hal, config->radio_csn, config->radio_irq, config->radio_ce_rst);
+    Module* mod = new Module(hal, config->radio_csn, RADIOLIB_NC, config->radio_ce_rst);
     radio = new nRF24(mod);
     
     state = radio->begin();
