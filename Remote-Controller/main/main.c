@@ -2,44 +2,33 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "driver/usb_serial_jtag.h"
 #include "driver/gpio.h"
+#include "driver/usb_serial_jtag.h"
 #include "led_strip.h"
 #include "rc_protocol.h"
 #include "esp_log.h"
 #include "esp_now.h"
 #include "esp_wifi.h"
 #include "nvs_flash.h"
+#include "esp_adc/adc_oneshot.h"
 
 static const char *TAG = "MAIN_LOOP";
 
-// --- SCANNING STATE ---
-static uint8_t current_channel = 1;
-static bool link_established = false;
-static uint32_t last_recv_time = 0;
-static uint32_t last_scan_time = 0;
-
 // --- RC STATE ---
 static control_packet_t last_command = { .header = 0xA5, .status = 0, .checksum = 0 };
-static uint32_t last_usb_time = 0;
+static bool link_established = false;
+static uint32_t last_recv_time = 0;
 
 // --- GPIO CONFIG ---
 #define RED_LED_GPIO      21  // Standard LED
 #define RGB_LED_GPIO      48  // Common WS2812 pin on S3 DevKits
 #define STATUS_LED_COUNT  1
+#define PITCH_CENTER      1748  // 2048 - 300
+#define ROLL_CENTER       1728  // 2048 - 320
+#define DEADZONE          50
 
-// --- USB TELEMETRY FORMAT ---
-#pragma pack(push, 1)
-typedef struct {
-    uint8_t header;       // 1 byte (0x5A)
-    float voltage;        // 4 bytes
-    float pitch;          // 4 bytes
-    float roll;           // 4 bytes
-    float yaw;            // 4 bytes
-    uint8_t link_quality; // 1 byte
-} usb_telemetry_t;        // Total: 18 bytes
-#pragma pack(pop)
-
+// --- GLOBAL HANDLES ---
+adc_oneshot_unit_handle_t adc1_handle; // Fixed: Now global so all functions can see it
 static led_strip_handle_t led_strip;
 
 void set_rgb(uint32_t r, uint32_t g, uint32_t b) {

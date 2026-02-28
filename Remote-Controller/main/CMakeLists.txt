@@ -8,6 +8,7 @@ idf_component_register(
         esp_event
         nvs_flash
         esp_netif
+        esp_adc
         lwip
         driver
         esp_psram
