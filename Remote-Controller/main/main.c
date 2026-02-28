@@ -44,15 +44,13 @@ int map_joystick(int raw_val, int center_val) {
         return 0; 
     }
 
-    // 2. Map to -100 to 100 percentage
+    // 2. Map to the full 16-bit range: -32768 to +32767
     if (raw_val < center_val) {
         // Negative side (Stick pulling down/left)
-        // Maps the range [0 to center] -> [-100 to 0]
-        return (diff * 100) / center_val;
+        return (diff * 32768) / center_val;
     } else {
         // Positive side (Stick pushing up/right)
-        // Maps the range [center to 4095] -> [0 to 100]
-        return (diff * 100) / (4095 - center_val);
+        return (diff * 32767) / (4095 - center_val);
     }
 }
 
