@@ -24,7 +24,7 @@ static uint32_t last_recv_time = 0;
 #define RGB_LED_GPIO      48  // Common WS2812 pin on S3 DevKits
 #define STATUS_LED_COUNT  1
 #define PITCH_CENTER      1748  // 2048 - 300
-#define ROLL_CENTER       1728  // 2048 - 320
+#define YAW_CENTER       1728  // 2048 - 320
 #define DEADZONE          50
 
 // --- GLOBAL HANDLES ---
@@ -159,7 +159,7 @@ void app_main(void)
 
     // EMA state variables
     float pitch_smoothed = PITCH_CENTER; 
-    float roll_smoothed = ROLL_CENTER;
+    float yaw_smoothed = YAW_CENTER;
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(20); // 50Hz Update Rate (Standard for RC)
@@ -187,15 +187,15 @@ void app_main(void)
 
         // Apply EMA Filter (0.2 = 20% new reading, 80% old history)
         pitch_smoothed = (0.2 * x_raw) + (0.8 * pitch_smoothed);
-        roll_smoothed = (0.2 * y_raw) + (0.8 * roll_smoothed);
+        yaw_smoothed = (0.2 * y_raw) + (0.8 * yaw_smoothed);
 
         // Map the values to a clean -100 to +100 range
         last_command.pitch = map_joystick((int)pitch_smoothed, PITCH_CENTER);
-        last_command.roll  = map_joystick((int)roll_smoothed, ROLL_CENTER);
+        last_command.yaw  = map_joystick((int)yaw_smoothed, YAW_CENTER);
 
         uint8_t *p = (uint8_t*)&last_command;
         last_command.checksum = 0;
-        for (int i = 0; i < (sizeof(control_packet_t) - 1); i++) 
+        for (int i = 1; i < (sizeof(control_packet_t) - 1); i++) 
         {
             last_command.checksum ^= p[i];
         }
@@ -210,7 +210,7 @@ void app_main(void)
         } */
 
         esp_err_t result = esp_now_send(BROADCAST_MAC, (uint8_t*)&last_command, sizeof(control_packet_t));
-        ESP_LOGI(TAG, "Sent control packet with Pitch: %d, Roll: %d", last_command.pitch, last_command.roll);
+        ESP_LOGI(TAG, "Sent control packet with Pitch: %d, Yaw: %d", last_command.pitch, last_command.yaw);
         
         if (result != ESP_OK) {
             ESP_LOGE(TAG, "Error sending: %s", esp_err_to_name(result));
