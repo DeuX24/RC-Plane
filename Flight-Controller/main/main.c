@@ -5,6 +5,7 @@
 #include "esp_log.h"
 #include "esp_now.h"
 #include "esp_wifi.h"
+#include "nvs_flash.h"
 #include "rc_protocol.h"
 #include "actuator_control.h"
 #include "udp_logger.h"
@@ -60,6 +61,27 @@ void on_data_recv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int
 
 // --- INITIALIZATION FUNCTION ---
 void init_all() {
+
+    // 1. Initialize NVS (Wi-Fi requires this to store calibration data)
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        ret = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(ret);
+
+    // 2. Initialize the Wi-Fi stack (Required for ESP-NOW)
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
+    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
+    ESP_ERROR_CHECK(esp_wifi_set_storage(WIFI_STORAGE_RAM));
+    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
+    ESP_ERROR_CHECK(esp_wifi_start());
+
+    ESP_ERROR_CHECK(esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE)); // Lock to channel 1
+    ESP_ERROR_CHECK(esp_wifi_set_ps(WIFI_PS_NONE)); // Force radio to stay awake 100%
+
     ESP_ERROR_CHECK(esp_now_init());
     ESP_ERROR_CHECK(esp_now_register_recv_cb(on_data_recv));
 
@@ -71,7 +93,7 @@ void init_all() {
 
 void app_main(void)
 {
-    init_wifi_and_udp_logger("Hos Therese IoT", "S7jodi4n", "192.168.2.96", 3333);
+    // init_wifi_and_udp_logger("Hos Therese IoT", "S7jodi4n", "192.168.2.96", 3333);
 
     // Initialize all hardware peripherals
     init_all();
