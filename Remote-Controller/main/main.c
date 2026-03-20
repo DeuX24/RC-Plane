@@ -124,7 +124,6 @@ void on_telem_recv(const esp_now_recv_info_t *recv_info, const uint8_t *data, in
 }
 
 // Callback to tell us if our transmission was successful
-// Updated for ESP-IDF v5.x API
 void on_data_sent(const wifi_tx_info_t *tx_info, esp_now_send_status_t status) {
     if (status != ESP_NOW_SEND_SUCCESS) {
         ESP_LOGE(TAG, "TX Delivery Fail"); 
@@ -171,7 +170,6 @@ void init_comms() {
     esp_wifi_set_mode(WIFI_MODE_STA);
     esp_wifi_start();
 
-    // ---> ADD THIS LINE TO FIX PACKET LOSS <---
     esp_wifi_set_ps(WIFI_PS_NONE);
     esp_wifi_set_channel(1, WIFI_SECOND_CHAN_NONE);
 
