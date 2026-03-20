@@ -132,21 +132,33 @@ void on_data_sent(const wifi_tx_info_t *tx_info, esp_now_send_status_t status) {
     }
 }
 
-void init_joystick() {
+void init_joysticks() {
+    // Initialize ADC Unit 1 (Handles all 4 joystick axes)
     adc_oneshot_unit_init_cfg_t init_config1 = {
         .unit_id = ADC_UNIT_1,
         .ulp_mode = ADC_ULP_MODE_DISABLE,
     };
     ESP_ERROR_CHECK(adc_oneshot_new_unit(&init_config1, &adc1_handle));
 
+    // Shared configuration 
     adc_oneshot_chan_cfg_t config = {
         .bitwidth = ADC_BITWIDTH_DEFAULT,
         .atten = ADC_ATTEN_DB_12,
     };
     
-    // GPIO 5 (X) and GPIO 6 (Y)
+    // --------------------------------------------------
+    // JOYSTICK 1
+    // --------------------------------------------------
+    // GPIO 5 (ADC1_CH4) and GPIO 6 (ADC1_CH5)
     ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_4, &config));
     ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_5, &config));
+
+    // --------------------------------------------------
+    // JOYSTICK 2 
+    // --------------------------------------------------
+    // GPIO 9 (ADC1_CH8) and GPIO 10 (ADC1_CH9)
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_8, &config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_9, &config));
 }
 
 void init_comms() {
@@ -180,7 +192,7 @@ void init_comms() {
 void init_all() {
 
     init_comms();
-    init_joystick();
+    init_joysticks();
 
     // 4. Init Red LED
     gpio_reset_pin(RED_LED_GPIO);
