@@ -214,7 +214,8 @@ void app_main(void)
     // Initialize everything (GPIOs, RMT for WS2812, etc.)
     init_all();
 
-    int x_raw, y_raw;
+    int joy1_x, joy1_y;
+    int joy2_x, joy2_y;
 
     // EMA state variables
     float pitch_smoothed = PITCH_CENTER; 
@@ -241,16 +242,23 @@ void app_main(void)
             set_rgb(50, 0, 50); // PURPLE (Link Lost)
         }
 
-        adc_oneshot_read(adc1_handle, ADC_CHANNEL_4, &x_raw);
-        adc_oneshot_read(adc1_handle, ADC_CHANNEL_5, &y_raw);
+        adc_oneshot_read(adc1_handle, ADC_CHANNEL_4, &joy1_x);
+        adc_oneshot_read(adc1_handle, ADC_CHANNEL_5, &joy1_y);
+
+        // Read Joystick 2 (GPIO 9 & 10)
+        adc_oneshot_read(adc1_handle, ADC_CHANNEL_8, &joy2_x);
+        adc_oneshot_read(adc1_handle, ADC_CHANNEL_9, &joy2_y);
 
         // Apply EMA Filter (0.2 = 20% new reading, 80% old history)
-        pitch_smoothed = (0.2 * x_raw) + (0.8 * pitch_smoothed);
-        yaw_smoothed = (0.2 * y_raw) + (0.8 * yaw_smoothed);
+        pitch_smoothed = (0.2 * joy1_x) + (0.8 * pitch_smoothed);
+        yaw_smoothed = (0.2 * joy1_y) + (0.8 * yaw_smoothed);
 
         // Map the values to a clean -100 to +100 range
+        last_command.status = !gpio_get_level(BUTTON_PIN); // Read button state (Active LOW)
         last_command.pitch = map_joystick((int)pitch_smoothed, PITCH_CENTER);
         last_command.yaw  = map_joystick((int)yaw_smoothed, YAW_CENTER);
+        last_command.roll = map_joystick(joy2_x, PITCH_CENTER); // Use Joystick 2 X-axis for Roll
+        last_command.throttle = map_throttle_uint8(joy2_y, THROTTLE_CENTER); // Use the custom function for throttle mapping
 
         uint8_t *p = (uint8_t*)&last_command;
         last_command.checksum = 0;
