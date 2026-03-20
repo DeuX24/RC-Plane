@@ -24,11 +24,14 @@ static uint32_t last_recv_time = 0;
 #define RGB_LED_GPIO      48  // Common WS2812 pin on S3 DevKits
 #define STATUS_LED_COUNT  1
 #define PITCH_CENTER      1748  // 2048 - 300
-#define YAW_CENTER       1728  // 2048 - 320
+#define YAW_CENTER        1728  // 2048 - 320
+#define THROTTLE_CENTER   1750
 #define DEADZONE          50
 
+#define BUTTON_PIN GPIO_NUM_4
+
 // --- GLOBAL HANDLES ---
-adc_oneshot_unit_handle_t adc1_handle; // Fixed: Now global so all functions can see it
+adc_oneshot_unit_handle_t adc1_handle;
 static led_strip_handle_t led_strip;
 
 void set_rgb(uint32_t r, uint32_t g, uint32_t b) {
