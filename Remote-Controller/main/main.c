@@ -39,6 +39,28 @@ void set_rgb(uint32_t r, uint32_t g, uint32_t b) {
     led_strip_refresh(led_strip);
 }
 
+void configure_status_button() {
+    gpio_config_t io_conf = {}; // Zero-initialize the config structure
+    
+    // Disable interrupts for standard polling
+    io_conf.intr_type = GPIO_INTR_DISABLE; 
+    
+    // Set as Input mode
+    io_conf.mode = GPIO_MODE_INPUT; 
+    
+    // Bit mask of the pins you want to set (you can OR multiple pins together)
+    io_conf.pin_bit_mask = (1ULL << BUTTON_PIN); 
+    
+    // Disable pull-down mode
+    io_conf.pull_down_en = 0; 
+    
+    // Enable pull-up mode
+    io_conf.pull_up_en = 1; 
+    
+    // Apply the configuration
+    gpio_config(&io_conf);
+}
+
 int map_joystick(int raw_val, int center_val) {
     int diff = raw_val - center_val;
     
