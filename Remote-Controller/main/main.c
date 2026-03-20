@@ -57,6 +57,28 @@ int map_joystick(int raw_val, int center_val) {
     }
 }
 
+uint8_t map_throttle_uint8(int raw_val, int center_val) {
+    if (raw_val > 4095) 
+    {
+        raw_val = 4095;
+    }
+
+    int diff = raw_val - center_val;
+
+    // 1. Deadzone & Bottom-Half Check (Return 0 throttle)
+    if (diff <= DEADZONE) {
+        return 0; 
+    }
+
+    // 3. Map the active positive side to 0-255
+    int active_diff = diff - DEADZONE;
+    int active_range = (4095 - center_val) - DEADZONE;
+
+    // Calculate the percentage and cast to uint8_t
+    // (active_diff * 255) maxes out around ~570,000, which safely fits in a standard 32-bit int
+    return (uint8_t)((active_diff * 255) / active_range);
+}
+
 // Callback for incoming telemetry from the plane
 void on_telem_recv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) 
 {
