@@ -138,6 +138,53 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Plane Receiver Online via ESP-NOW. Listening for control packets...");
 
+    // Setup the precise timing variables for FreeRTOS
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xFrequency = pdMS_TO_TICKS(100); // 100ms exact period
 
-    while(1) { vTaskDelay(pdMS_TO_TICKS(1000)); } // Passive loop
+    const double hours_elapsed = 0.1 / 3600.0; // 100ms loop delay
+
+    while(1) { 
+        float voltage_ch1 = 0.0f, voltage_ch2 = 0.0f, voltage_ch3 = 0.0f;
+        float shunt_mv = 0.0f;     
+        float current_ma_ch2 = 0.0f; 
+        float current_ma_ch3 = 0.0f; 
+
+        // --- CHANNEL 1 (Voltage Only) ---
+        if (ina3221_get_bus_voltage(&ina_dev, INA3221_CHANNEL_1, &voltage_ch1) == ESP_OK) {
+            current_voltage = voltage_ch1; // Update global for telemetry (Main Battery)
+        }
+
+        // --- CHANNEL 2 ---
+        if (ina3221_get_bus_voltage(&ina_dev, INA3221_CHANNEL_2, &voltage_ch2) == ESP_OK &&
+            ina3221_get_shunt_value(&ina_dev, INA3221_CHANNEL_2, &shunt_mv, &current_ma_ch2) == ESP_OK) {
+            
+            // Math uses CH2's specific voltage
+            double power_mw_ch2 = (double)voltage_ch2 * (double)current_ma_ch2;    
+
+            total_mah_consumed += ((double)current_ma_ch2 * hours_elapsed);
+            total_mwh_consumed += (power_mw_ch2 * hours_elapsed);
+
+            ESP_LOGI(TAG, "CH2 | Voltage: %.2f V | Current: %.2f mA | Power: %.2f mW", 
+                     voltage_ch2, current_ma_ch2, power_mw_ch2);
+        }
+
+        // --- CHANNEL 3 ---
+        if (ina3221_get_bus_voltage(&ina_dev, INA3221_CHANNEL_3, &voltage_ch3) == ESP_OK &&
+            ina3221_get_shunt_value(&ina_dev, INA3221_CHANNEL_3, &shunt_mv, &current_ma_ch3) == ESP_OK) {
+            
+            // Math uses CH3's specific voltage
+            double power_mw_ch3 = (double)voltage_ch3 * (double)current_ma_ch3;
+            
+            total_mah_consumed += ((double)current_ma_ch3 * hours_elapsed);
+            total_mwh_consumed += (power_mw_ch3 * hours_elapsed);
+
+            ESP_LOGI(TAG, "CH3 | Voltage: %.2f V | Current: %.2f mA | Power: %.2f mW", 
+                     voltage_ch3, current_ma_ch3, power_mw_ch3);
+        }
+
+        // Wait for exactly the remainder of the 100ms cycle
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+    }
+
 }
