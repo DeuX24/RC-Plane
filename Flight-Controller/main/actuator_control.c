@@ -13,14 +13,16 @@ static const char *TAG = "ACTUATOR";
 #define PIN_MOTOR_ESC    10
 
 // --- TIMING CONFIGURATION ---
-// Servos usually use 500us to 2500us
-#define SERVO_MIN_US     500   
-#define SERVO_MAX_US     2500  
-#define SERVO_NEUTRAL_US 1500  
-
 // ESCs (Motors) usually use 1000us (Off) to 2000us (Max)
 #define ESC_MIN_US       1000
 #define ESC_MAX_US       2000
+
+// Servos usually use 500us to 2500us | 800-2500
+// SERVO TIMINGS
+static const ServoConfig_t config_elevator      = {800, 1650, 2500, false};
+static const ServoConfig_t config_rudder        = {1000, 1650, 2300, false};
+static const ServoConfig_t config_left_aileron  = {900, 1550, 2400, false};
+static const ServoConfig_t config_right_aileron = {900, 1500, 2400, false}; // Reversed!
 
 // Global handles for comparators
 static mcpwm_cmpr_handle_t cmpr_pitch = NULL;
@@ -29,11 +31,39 @@ static mcpwm_cmpr_handle_t cmpr_left_aileron = NULL;
 static mcpwm_cmpr_handle_t cmpr_right_aileron = NULL;
 static mcpwm_cmpr_handle_t cmpr_throttle = NULL;
 
+
+
 // Helper function to map values
 static uint32_t map_value(long x, long in_min, long in_max, long out_min, long out_max) {
     if (x < in_min) x = in_min;
     if (x > in_max) x = in_max;
     return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+static uint32_t map_value_centered(long x, long in_min, long in_max, ServoConfig_t config) {
+// Calculate the input center (e.g., exactly 0 for -32768 to 32767)
+    long in_center = (in_min + in_max) / 2; 
+    
+    // Handle reversing transparently! 
+    // If reversed, swap the min and max, but leave neutral alone.
+    long out_min = config.reverse ? config.max_us : config.min_us;
+    long out_max = config.reverse ? config.min_us : config.max_us;
+    long out_center = config.neutral_us;
+
+    // Clamp the input to prevent servos from over-traveling
+    if (x < in_min) x = in_min;
+    if (x > in_max) x = in_max;
+
+    // Piecewise interpolation
+    if (x < in_center) {
+        return (x - in_min) * (out_center - out_min) / (in_center - in_min) + out_min;
+    } 
+    else if (x > in_center) {
+        return (x - in_center) * (out_max - out_center) / (in_max - in_center) + out_center;
+    } 
+    else {
+        return out_center;
+    }
 }
 
 // Helper to set up a channel
@@ -85,12 +115,12 @@ void actuators_init(void) {
 
     // Setup 
     // Allocate 2 channels to Group 0 (Tail surfaces)
-    setup_mcpwm_channel(0, timer0, PIN_SERVO_ELEVATOR, &cmpr_pitch, SERVO_NEUTRAL_US);
-    setup_mcpwm_channel(0, timer0, PIN_SERVO_RUDDER, &cmpr_yaw, SERVO_NEUTRAL_US);
+    setup_mcpwm_channel(0, timer0, PIN_SERVO_ELEVATOR, &cmpr_pitch, config_elevator.neutral_us);
+    setup_mcpwm_channel(0, timer0, PIN_SERVO_RUDDER, &cmpr_yaw, config_rudder.neutral_us);
 
     // Allocate 3 channels to Group 1 (Wing surfaces & Throttle)
-    setup_mcpwm_channel(1, timer1, PIN_SERVO_LEFT_AILERON, &cmpr_left_aileron, SERVO_NEUTRAL_US);
-    setup_mcpwm_channel(1, timer1, PIN_SERVO_RIGHT_AILERON, &cmpr_right_aileron, SERVO_NEUTRAL_US);
+    setup_mcpwm_channel(1, timer1, PIN_SERVO_LEFT_AILERON, &cmpr_left_aileron, config_left_aileron.neutral_us);
+    setup_mcpwm_channel(1, timer1, PIN_SERVO_RIGHT_AILERON, &cmpr_right_aileron, config_right_aileron.neutral_us);
     // Safety: Initialize throttle to lowest setting (1000us) so the ESC doesn't spin the motor
     setup_mcpwm_channel(1, timer1, PIN_MOTOR_ESC, &cmpr_throttle, ESC_MIN_US);
 
@@ -106,22 +136,28 @@ void actuators_init(void) {
 }
 
 void actuator_set_pitch(int16_t pitch_raw) {
-    uint32_t pulse = map_value(pitch_raw, -32768, 32767, SERVO_MIN_US, SERVO_MAX_US);
+    if (cmpr_pitch == NULL) return; // Prevent crash if called too early
+
+    uint32_t pulse = map_value_centered(pitch_raw, -32768, 32767, config_elevator);
     mcpwm_comparator_set_compare_value(cmpr_pitch, pulse);
 }
 
 void actuator_set_yaw(int16_t yaw_raw) {
-    uint32_t pulse = map_value(yaw_raw, -32768, 32767, SERVO_MIN_US, SERVO_MAX_US);
+    if (cmpr_yaw == NULL) return;
+
+    uint32_t pulse = map_value_centered(yaw_raw, -32768, 32767, config_rudder);
     mcpwm_comparator_set_compare_value(cmpr_yaw, pulse);
 }
 
 void actuator_set_roll(int16_t roll_raw) {
+    if (cmpr_left_aileron == NULL || cmpr_right_aileron == NULL) return;
+
     // Left aileron moves normally
-    uint32_t pulse_left = map_value(roll_raw, -32768, 32767, SERVO_MIN_US, SERVO_MAX_US);
+    uint32_t pulse_left = map_value_centered(roll_raw, -32768, 32767, config_left_aileron);
     
     // Right aileron moves in the opposite direction (Differential)
     // We invert the output range: min input maps to max pulse
-    uint32_t pulse_right = map_value(roll_raw, -32768, 32767, SERVO_MAX_US, SERVO_MIN_US);
+    uint32_t pulse_right = map_value_centered(roll_raw, -32768, 32767, config_right_aileron);
     
     mcpwm_comparator_set_compare_value(cmpr_left_aileron, pulse_left);
     mcpwm_comparator_set_compare_value(cmpr_right_aileron, pulse_right);

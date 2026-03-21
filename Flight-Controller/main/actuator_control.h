@@ -2,6 +2,7 @@
 #define ACTUATOR_CONTROL_H
 
 #include <stdint.h>
+#include <stdbool.h>
 
 // Initialize the MCPWM timer, operators, and generators for all actuators
 void actuators_init(void);
@@ -13,5 +14,12 @@ void actuator_set_roll(int16_t roll_raw);
 
 // Setter for the motor ESC (Input: 0 to 255)
 void actuator_set_throttle(uint8_t throttle_raw);
+
+typedef struct {
+    uint32_t min_us;
+    uint32_t neutral_us;
+    uint32_t max_us;
+    bool reverse; // Optional, but handy for that right aileron!
+} ServoConfig_t;
 
 #endif // ACTUATOR_CONTROL_H
