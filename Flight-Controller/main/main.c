@@ -98,6 +98,33 @@ void init_all() {
 
     // Initialize Servos and Motor
     actuators_init();
+
+    // Initialize INA3221 for voltage monitoring
+    ESP_ERROR_CHECK(i2cdev_init());
+    
+    // Address INA3221_I2C_ADDR_GND assumes the A0 pin is tied to Ground. Adjust if tied to VS/SDA/SCL.
+    if (ina3221_init_desc(&ina_dev, INA3221_I2C_ADDR_GND, 0, I2C_SDA_PIN, I2C_SCL_PIN) == ESP_OK) 
+    {
+        ina3221_reset(&ina_dev);
+        
+        ina_dev.shunt[INA3221_CHANNEL_2] = 100; 
+        ina_dev.shunt[INA3221_CHANNEL_3] = 100; 
+
+        // Set the hardware averaging to 16 samples
+        ina3221_set_average(&ina_dev, INA3221_AVG_16);
+
+        // (Optional) Explicitly set the conversion time to 1.1ms (this is usually default)
+        ina3221_set_shunt_conversion_time(&ina_dev, INA3221_CT_1100);
+        ina3221_set_bus_conversion_time(&ina_dev, INA3221_CT_1100);
+
+        ina3221_enable_channel(&ina_dev, true, true, true);
+        
+        ESP_LOGI(TAG, "INA3221 Initialized: Hardware Averaging ON (16x)");
+    } 
+    else 
+    {
+        ESP_LOGE(TAG, "Failed to initialize INA3221");
+    }
 }
 
 
