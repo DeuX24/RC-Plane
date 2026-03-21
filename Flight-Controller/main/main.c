@@ -10,7 +10,18 @@
 #include "actuator_control.h"
 #include "udp_logger.h"
 
+#include "i2cdev.h"
+#include "ina3221.h"
+
 static const char *TAG = "PLANE_MAIN";
+
+#define I2C_SDA_PIN GPIO_NUM_8
+#define I2C_SCL_PIN GPIO_NUM_9
+
+ina3221_t ina_dev;
+float current_voltage = 12.6f; // Global to store the latest voltage reading
+double total_mah_consumed = 0.0; 
+double total_mwh_consumed = 0.0;
 
 // Helper: Maps 9.0V - 13.0V to 0-255 for a 3S LiPo, change this if you use a different battery configuration.
 uint8_t pack_3s_voltage(float voltage) {
