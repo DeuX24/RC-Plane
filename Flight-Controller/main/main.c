@@ -153,6 +153,8 @@ void app_main(void)
         // --- CHANNEL 1 (Voltage Only) ---
         if (ina3221_get_bus_voltage(&ina_dev, INA3221_CHANNEL_1, &voltage_ch1) == ESP_OK) {
             current_voltage = voltage_ch1; // Update global for telemetry (Main Battery)
+
+            ESP_LOGI(TAG, "CH1 | Voltage: %.2f V", voltage_ch1);
         }
 
         // --- CHANNEL 2 ---
