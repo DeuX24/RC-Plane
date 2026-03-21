@@ -59,7 +59,7 @@ void on_data_recv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int
             // Construct telemetry
             telemetry_packet_t telem = {
                 .header = 0x5A,
-                .voltage = 12.6f, 
+                .voltage = current_voltage, 
                 .pitch = (float)packet.pitch / 364.0f,
                 .roll = (float)packet.roll / 364.0f,
                 .yaw = (float)packet.yaw / 364.0f,
