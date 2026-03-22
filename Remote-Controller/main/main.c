@@ -213,12 +213,14 @@ void app_main(void)
     // Initialize everything (GPIOs, RMT for WS2812, etc.)
     init_all();
 
-    int joy1_x, joy1_y;
-    int joy2_x, joy2_y;
+    int pitch_raw, yaw_raw;
+    int roll_raw, throttle_raw;
 
     // EMA state variables
     float pitch_smoothed = PITCH_CENTER; 
     float yaw_smoothed = YAW_CENTER;
+    float roll_smoothed = ROLL_CENTER;
+    float throttle_smoothed = THROTTLE_CENTER;
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(20); // 50Hz Update Rate (Standard for RC)
