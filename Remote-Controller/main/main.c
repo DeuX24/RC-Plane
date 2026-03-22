@@ -243,23 +243,26 @@ void app_main(void)
             set_rgb(50, 0, 50); // PURPLE (Link Lost)
         }
 
-        adc_oneshot_read(adc1_handle, ADC_CHANNEL_4, &joy1_x);
-        adc_oneshot_read(adc1_handle, ADC_CHANNEL_5, &joy1_y);
+        // Read Joystick 1 (GPIO 5 & 6)
+        adc_oneshot_read(adc1_handle, ADC_CHANNEL_4, &yaw_raw);
+        adc_oneshot_read(adc1_handle, ADC_CHANNEL_5, &throttle_raw);
 
         // Read Joystick 2 (GPIO 9 & 10)
-        adc_oneshot_read(adc1_handle, ADC_CHANNEL_8, &joy2_x);
-        adc_oneshot_read(adc1_handle, ADC_CHANNEL_9, &joy2_y);
+        adc_oneshot_read(adc1_handle, ADC_CHANNEL_8, &roll_raw);
+        adc_oneshot_read(adc1_handle, ADC_CHANNEL_9, &pitch_raw);
 
         // Apply EMA Filter (0.2 = 20% new reading, 80% old history)
-        pitch_smoothed = (0.2 * joy1_x) + (0.8 * pitch_smoothed);
-        yaw_smoothed = (0.2 * joy1_y) + (0.8 * yaw_smoothed);
+        pitch_smoothed = (0.2 * pitch_raw) + (0.8 * pitch_smoothed);
+        yaw_smoothed = (0.2 * yaw_raw) + (0.8 * yaw_smoothed);
+        roll_smoothed = (0.2 * roll_raw) + (0.8 * roll_smoothed);
+        throttle_smoothed = (0.2 * throttle_raw) + (0.8 * throttle_smoothed);
 
         // Map the values to a clean -100 to +100 range
         last_command.status = !gpio_get_level(BUTTON_PIN); // Read button state (Active LOW)
         last_command.pitch = map_joystick((int)pitch_smoothed, PITCH_CENTER);
         last_command.yaw  = map_joystick((int)yaw_smoothed, YAW_CENTER);
-        last_command.roll = map_joystick(joy2_x, PITCH_CENTER); // Use Joystick 2 X-axis for Roll
-        last_command.throttle = map_throttle_uint8(joy2_y, THROTTLE_CENTER); // Use the custom function for throttle mapping
+        last_command.roll = map_joystick((int)roll_smoothed, ROLL_CENTER); // Use Joystick 2 X-axis for Roll
+        last_command.throttle = map_throttle_uint8((int)throttle_smoothed, THROTTLE_CENTER); // Use the custom function for throttle mapping
 
         uint8_t *p = (uint8_t*)&last_command;
         last_command.checksum = 0;
