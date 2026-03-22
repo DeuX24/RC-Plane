@@ -270,18 +270,18 @@ void app_main(void)
         {
             last_command.checksum ^= p[i];
         }
-
-/*         // Log for debugging (Only every 10th frame to avoid flooding)
-        if (print_counter++ >= 100) 
-        {
-            ESP_LOGI(TAG, "Pitch: %d, Roll: %d", last_command.pitch, last_command.roll);
-            //ESP_LOGI(TAG, "x_raw: %d, y_raw: %d", x_raw, y_raw);
-            set_rgb(0, 50, 0); // GREEN = Ready to Send
-            print_counter = 0; // Reset counter after logging
-        } */
+         
+        // // Log for debugging (Only every 10th frame to avoid flooding)
+        // if (print_counter++ >= 10) 
+        // {
+        //     ESP_LOGI(TAG, "Raw: P=%d Y=%d R=%d T=%d | Smoothed: P=%.1f Y=%.1f R=%.1f T=%.1f", 
+        //     pitch_raw, yaw_raw, roll_raw, throttle_raw, 
+        //     pitch_smoothed, yaw_smoothed, roll_smoothed, throttle_smoothed);
+        //     print_counter = 0; // Reset counter after logging
+        // } 
 
         esp_err_t result = esp_now_send(BROADCAST_MAC, (uint8_t*)&last_command, sizeof(control_packet_t));
-        ESP_LOGI(TAG, "Sent control packet with Pitch: %d, Yaw: %d", last_command.pitch, last_command.yaw);
+        // ESP_LOGI(TAG, "Sent control packet with Pitch: %d, Yaw: %d", last_command.pitch, last_command.yaw);
         
         if (result != ESP_OK) {
             ESP_LOGE(TAG, "Error sending: %s", esp_err_to_name(result));
