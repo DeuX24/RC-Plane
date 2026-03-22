@@ -23,8 +23,9 @@ static uint32_t last_recv_time = 0;
 #define RED_LED_GPIO      21  // Standard LED
 #define RGB_LED_GPIO      48  // Common WS2812 pin on S3 DevKits
 #define STATUS_LED_COUNT  1
-#define PITCH_CENTER      1748  // 2048 - 300
-#define YAW_CENTER        1728  // 2048 - 320
+#define PITCH_CENTER      1660  // 2048 - 300
+#define YAW_CENTER        1740  // 2048 - 320
+#define ROLL_CENTER       1730 
 #define THROTTLE_CENTER   1750
 #define DEADZONE          50
 
