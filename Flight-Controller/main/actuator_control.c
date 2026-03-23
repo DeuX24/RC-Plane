@@ -20,7 +20,7 @@ static const char *TAG = "ACTUATOR";
 // Servos usually use 500us to 2500us | 800-2500
 // SERVO TIMINGS
 static const ServoConfig_t config_elevator      = {800, 1650, 2500, false};
-static const ServoConfig_t config_rudder        = {1000, 1650, 2300, false};
+static const ServoConfig_t config_rudder        = {1000, 1650, 2300, true};
 static const ServoConfig_t config_left_aileron  = {900, 1550, 2400, false};
 static const ServoConfig_t config_right_aileron = {900, 1500, 2400, false}; // Reversed!
 
