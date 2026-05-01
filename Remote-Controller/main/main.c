@@ -9,8 +9,11 @@
 #include "esp_log.h"
 #include "esp_now.h"
 #include "esp_wifi.h"
+#include "esp_event.h"
 #include "nvs_flash.h"
 #include "esp_adc/adc_oneshot.h"
+#include "remote_ota.h"
+#include "joystick_calib.h"
 
 static const char *TAG = "MAIN_LOOP";
 
@@ -23,13 +26,9 @@ static uint32_t last_recv_time = 0;
 #define RED_LED_GPIO      21  // Standard LED
 #define RGB_LED_GPIO      48  // Common WS2812 pin on S3 DevKits
 #define STATUS_LED_COUNT  1
-#define PITCH_CENTER      1660  // 2048 - 300
-#define YAW_CENTER        1740  // 2048 - 320
-#define ROLL_CENTER       1730 
-#define THROTTLE_CENTER   1750
 #define DEADZONE          50
 
-#define BUTTON_PIN GPIO_NUM_4
+#define BUTTON_PIN GPIO_NUM_14
 
 // --- GLOBAL HANDLES ---
 adc_oneshot_unit_handle_t adc1_handle;
@@ -40,67 +39,51 @@ void set_rgb(uint32_t r, uint32_t g, uint32_t b) {
     led_strip_refresh(led_strip);
 }
 
-void configure_status_button() {
-    gpio_config_t io_conf = {}; // Zero-initialize the config structure
-    
-    // Disable interrupts for standard polling
-    io_conf.intr_type = GPIO_INTR_DISABLE; 
-    
-    // Set as Input mode
-    io_conf.mode = GPIO_MODE_INPUT; 
-    
-    // Bit mask of the pins you want to set (you can OR multiple pins together)
-    io_conf.pin_bit_mask = (1ULL << BUTTON_PIN); 
-    
-    // Disable pull-down mode
-    io_conf.pull_down_en = 0; 
-    
-    // Enable pull-up mode
-    io_conf.pull_up_en = 1; 
-    
-    // Apply the configuration
-    gpio_config(&io_conf);
+#pragma region JOYSTICK
+
+// Helper function to constrain raw values
+int constrain(int val, int min_val, int max_val) {
+    if (val < min_val) return min_val;
+    if (val > max_val) return max_val;
+    return val;
 }
 
-int map_joystick(int raw_val, int center_val) {
+int map_joystick(int raw_val, int min_val, int center_val, int max_val) {
+    raw_val = constrain(raw_val, min_val, max_val);
     int diff = raw_val - center_val;
     
-    // 1. Deadzone check
-    if (abs(diff) < DEADZONE) {
-        return 0; 
-    }
+    if (abs(diff) < DEADZONE) return 0; 
 
-    // 2. Map to the full 16-bit range: -32768 to +32767
     if (raw_val < center_val) {
-        // Negative side (Stick pulling down/left)
-        return (diff * 32768) / center_val;
+        int active_range = center_val - min_val - DEADZONE;
+        int active_diff = abs(diff) - DEADZONE;
+        // Check to prevent division by zero
+        if (active_range <= 0) return 0; 
+        return -(active_diff * 32768) / active_range;
     } else {
-        // Positive side (Stick pushing up/right)
-        return (diff * 32767) / (4095 - center_val);
+        int active_range = max_val - center_val - DEADZONE;
+        int active_diff = diff - DEADZONE;
+        if (active_range <= 0) return 0;
+        return (active_diff * 32767) / active_range;
     }
 }
 
-uint8_t map_throttle_uint8(int raw_val, int center_val) {
-    if (raw_val > 4095) 
-    {
-        raw_val = 4095;
-    }
-
+uint8_t map_throttle_uint8(int raw_val, int min_val, int center_val, int max_val) {
+    raw_val = constrain(raw_val, min_val, max_val);
     int diff = raw_val - center_val;
 
-    // 1. Deadzone & Bottom-Half Check (Return 0 throttle)
-    if (diff <= DEADZONE) {
-        return 0; 
-    }
+    if (diff <= DEADZONE) return 0; 
 
-    // 3. Map the active positive side to 0-255
     int active_diff = diff - DEADZONE;
-    int active_range = (4095 - center_val) - DEADZONE;
+    int active_range = max_val - center_val - DEADZONE;
+    if (active_range <= 0) return 0;
 
-    // Calculate the percentage and cast to uint8_t
-    // (active_diff * 255) maxes out around ~570,000, which safely fits in a standard 32-bit int
     return (uint8_t)((active_diff * 255) / active_range);
 }
+
+#pragma endregion
+
+#pragma region TRANSMISSION
 
 // Callback for incoming telemetry from the plane
 void on_telem_recv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int len) 
@@ -132,6 +115,32 @@ void on_data_sent(const wifi_tx_info_t *tx_info, esp_now_send_status_t status) {
     }
 }
 
+#pragma endregion
+
+#pragma region INITIALIZATION
+
+void configure_status_button() {
+    gpio_config_t io_conf = {}; // Zero-initialize the config structure
+    
+    // Disable interrupts for standard polling
+    io_conf.intr_type = GPIO_INTR_DISABLE; 
+    
+    // Set as Input mode
+    io_conf.mode = GPIO_MODE_INPUT; 
+    
+    // Bit mask of the pins you want to set (you can OR multiple pins together)
+    io_conf.pin_bit_mask = (1ULL << BUTTON_PIN); 
+    
+    // Disable pull-down mode
+    io_conf.pull_down_en = 0; 
+    
+    // Enable pull-up mode
+    io_conf.pull_up_en = 1; 
+    
+    // Apply the configuration
+    gpio_config(&io_conf);
+}
+
 void init_joysticks() {
     // Initialize ADC Unit 1 (Handles all 4 joystick axes)
     adc_oneshot_unit_init_cfg_t init_config1 = {
@@ -145,27 +154,15 @@ void init_joysticks() {
         .bitwidth = ADC_BITWIDTH_DEFAULT,
         .atten = ADC_ATTEN_DB_12,
     };
-    
-    // --------------------------------------------------
-    // JOYSTICK 1
-    // --------------------------------------------------
-    // GPIO 5 (ADC1_CH4) and GPIO 6 (ADC1_CH5)
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_4, &config));
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_5, &config));
 
-    // --------------------------------------------------
-    // JOYSTICK 2 
-    // --------------------------------------------------
-    // GPIO 9 (ADC1_CH8) and GPIO 10 (ADC1_CH9)
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_8, &config));
-    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, ADC_CHANNEL_9, &config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, JOY_PITCH_CHAN, &config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, JOY_YAW_CHAN, &config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, JOY_ROLL_CHAN, &config));
+    ESP_ERROR_CHECK(adc_oneshot_config_channel(adc1_handle, JOY_THROTTLE_CHAN, &config));
 }
 
-void init_comms() {
-    // 1. Minimal Wi-Fi Setup for ESP-NOW
-    nvs_flash_init();
-    esp_netif_init();
-    esp_event_loop_create_default();
+void init_esp_now() {
+    // 1. Minimal Wi-Fi Setup for ESP-NOW (Core network stack is already running)
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     esp_wifi_init(&cfg);
     esp_wifi_set_mode(WIFI_MODE_STA);
@@ -179,7 +176,7 @@ void init_comms() {
     esp_now_register_recv_cb(on_telem_recv);
     esp_now_register_send_cb(on_data_sent);
 
-    // 3. Add Plane as a Peer (Using Broadcast for now)
+    // 3. Add Plane as a Peer
     esp_now_peer_info_t peer_info = {};
     memcpy(peer_info.peer_addr, BROADCAST_MAC, 6);
     peer_info.channel = 1; 
@@ -188,44 +185,91 @@ void init_comms() {
 }
 
 // --- INITIALIZATION FUNCTION ---
-void init_all() {
+void init_essentials() {
 
-    init_comms();
+    esp_err_t ret = nvs_flash_init();
+    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+    // Configure the button so we can read it immediately
+    configure_status_button();
+    
+    // Configure the ADCs for the joysticks
     init_joysticks();
 
-    // 4. Init Red LED
+    // Init Red LED
     gpio_reset_pin(RED_LED_GPIO);
     gpio_set_direction(RED_LED_GPIO, GPIO_MODE_OUTPUT);
 
-    // 5. Init RGB LED (WS2812)
+    // Init RGB LED (WS2812)
     led_strip_config_t strip_config = {
         .strip_gpio_num = RGB_LED_GPIO,
         .max_leds = STATUS_LED_COUNT,
     };
     led_strip_rmt_config_t rmt_config = { .resolution_hz = 10 * 1000 * 1000 };
     ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
-    
+
     set_rgb(0, 0, 50); // Start with BLUE (Waiting)
 }
+
+#pragma endregion
 
 void app_main(void)
 {
     // Initialize everything (GPIOs, RMT for WS2812, etc.)
-    init_all();
+    init_essentials();
+
+    bool force_calib = false;
+
+    // Check the button state immediately on boot (Active LOW)
+    if (gpio_get_level(BUTTON_PIN) == 0) {
+        
+        set_rgb(50, 50, 0); // YELLOW = Button detected, waiting for decision
+        ESP_LOGI("BOOT", "Button held. Determining mode...");
+        
+        int hold_time = 0;
+        while (gpio_get_level(BUTTON_PIN) == 0) {
+            vTaskDelay(pdMS_TO_TICKS(100));
+            hold_time += 100;
+        }
+
+        if (hold_time > 3000) {
+            // Held for > 3 seconds -> Enter Home OTA Mode
+            set_rgb(0, 50, 50); // CYAN = OTA Mode
+            start_home_ota_mode();
+            
+            // Trap the processor here so it doesn't run the flight code
+            while(1) { vTaskDelay(pdMS_TO_TICKS(1000)); } 
+        } 
+        else {
+            // Held for < 3 seconds -> Force Calibration
+            force_calib = true;
+        }
+    }
+
+    // Run the calibration logic (loads from flash OR runs the loop if forced)
+    init_joystick_calibration(adc1_handle, force_calib, set_rgb);
+
+    // Only initialize ESP-NOW after we have safely bypassed OTA mode
+    init_esp_now();
+    
+    set_rgb(0, 50, 0); // Solid Green = Ready to fly
 
     int pitch_raw, yaw_raw;
     int roll_raw, throttle_raw;
 
     // EMA state variables
-    float pitch_smoothed = PITCH_CENTER; 
-    float yaw_smoothed = YAW_CENTER;
-    float roll_smoothed = ROLL_CENTER;
-    float throttle_smoothed = THROTTLE_CENTER;
+    float pitch_smoothed = joy_calib.pitch_center; 
+    float yaw_smoothed = joy_calib.yaw_center;
+    float roll_smoothed = joy_calib.roll_center;
+    float throttle_smoothed = joy_calib.throttle_min; // Start at min for safety
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(20); // 50Hz Update Rate (Standard for RC)
-
-    int print_counter = 0; // Add a dedicated counter
 
     while (1) 
     {
@@ -242,14 +286,11 @@ void app_main(void)
             link_established = false;
             set_rgb(50, 0, 50); // PURPLE (Link Lost)
         }
-
-        // Read Joystick 1 (GPIO 5 & 6)
-        adc_oneshot_read(adc1_handle, ADC_CHANNEL_4, &yaw_raw);
-        adc_oneshot_read(adc1_handle, ADC_CHANNEL_5, &throttle_raw);
-
-        // Read Joystick 2 (GPIO 9 & 10)
-        adc_oneshot_read(adc1_handle, ADC_CHANNEL_8, &roll_raw);
-        adc_oneshot_read(adc1_handle, ADC_CHANNEL_9, &pitch_raw);
+ 
+        adc_oneshot_read(adc1_handle, JOY_YAW_CHAN, &yaw_raw);
+        adc_oneshot_read(adc1_handle, JOY_THROTTLE_CHAN, &throttle_raw);
+        adc_oneshot_read(adc1_handle, JOY_ROLL_CHAN, &roll_raw);
+        adc_oneshot_read(adc1_handle, JOY_PITCH_CHAN, &pitch_raw);
 
         // Apply EMA Filter (0.2 = 20% new reading, 80% old history)
         pitch_smoothed = (0.2 * pitch_raw) + (0.8 * pitch_smoothed);
@@ -257,12 +298,14 @@ void app_main(void)
         roll_smoothed = (0.2 * roll_raw) + (0.8 * roll_smoothed);
         throttle_smoothed = (0.2 * throttle_raw) + (0.8 * throttle_smoothed);
 
-        // Map the values to a clean -100 to +100 range
-        last_command.status = !gpio_get_level(BUTTON_PIN); // Read button state (Active LOW)
-        last_command.pitch = map_joystick((int)pitch_smoothed, PITCH_CENTER);
-        last_command.yaw  = map_joystick((int)yaw_smoothed, YAW_CENTER);
-        last_command.roll = map_joystick((int)roll_smoothed, ROLL_CENTER); // Use Joystick 2 X-axis for Roll
-        last_command.throttle = map_throttle_uint8((int)throttle_smoothed, THROTTLE_CENTER); // Use the custom function for throttle mapping
+        // Map the values using the live NVS calibration data
+        last_command.status = !gpio_get_level(BUTTON_PIN); 
+        
+        last_command.pitch = map_joystick((int)pitch_smoothed, joy_calib.pitch_min, joy_calib.pitch_center, joy_calib.pitch_max);
+        last_command.yaw   = map_joystick((int)yaw_smoothed, joy_calib.yaw_min, joy_calib.yaw_center, joy_calib.yaw_max);
+        last_command.roll  = map_joystick((int)roll_smoothed, joy_calib.roll_min, joy_calib.roll_center, joy_calib.roll_max); 
+        
+        last_command.throttle = map_throttle_uint8((int)throttle_smoothed, joy_calib.throttle_min, joy_calib.throttle_center, joy_calib.throttle_max);
 
         uint8_t *p = (uint8_t*)&last_command;
         last_command.checksum = 0;
@@ -270,15 +313,6 @@ void app_main(void)
         {
             last_command.checksum ^= p[i];
         }
-         
-        // // Log for debugging (Only every 10th frame to avoid flooding)
-        // if (print_counter++ >= 10) 
-        // {
-        //     ESP_LOGI(TAG, "Raw: P=%d Y=%d R=%d T=%d | Smoothed: P=%.1f Y=%.1f R=%.1f T=%.1f", 
-        //     pitch_raw, yaw_raw, roll_raw, throttle_raw, 
-        //     pitch_smoothed, yaw_smoothed, roll_smoothed, throttle_smoothed);
-        //     print_counter = 0; // Reset counter after logging
-        // } 
 
         esp_err_t result = esp_now_send(BROADCAST_MAC, (uint8_t*)&last_command, sizeof(control_packet_t));
         // ESP_LOGI(TAG, "Sent control packet with Pitch: %d, Yaw: %d", last_command.pitch, last_command.yaw);
