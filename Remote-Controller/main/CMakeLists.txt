@@ -1,6 +1,8 @@
 idf_component_register(
     SRCS 
         "main.c"
+        "remote_ota.c"
+        "joystick_calib.c"
     INCLUDE_DIRS 
         "."
     REQUIRES 
