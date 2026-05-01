@@ -13,6 +13,8 @@ idf_component_register(
         driver
         esp_psram
         rc_protocol
+        esp_http_server 
+        app_update
     PRIV_REQUIRES 
         spi_flash
 )
