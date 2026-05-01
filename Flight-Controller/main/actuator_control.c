@@ -6,11 +6,12 @@
 static const char *TAG = "ACTUATOR";
 
 // --- PIN ASSIGNMENTS ---
-#define PIN_SERVO_ELEVATOR  15
-#define PIN_SERVO_RUDDER    16
-#define PIN_SERVO_LEFT_AILERON   14
-#define PIN_SERVO_RIGHT_AILERON   17
-#define PIN_MOTOR_ESC    10
+#define PIN_SERVO_LEFT_ELEVATOR  13
+#define PIN_SERVO_RIGHT_ELEVATOR  14
+#define PIN_SERVO_RUDDER    8
+#define PIN_SERVO_LEFT_AILERON   5
+#define PIN_SERVO_RIGHT_AILERON   16
+#define PIN_MOTOR_ESC    4
 
 // --- TIMING CONFIGURATION ---
 // ESCs (Motors) usually use 1000us (Off) to 2000us (Max)
@@ -19,14 +20,16 @@ static const char *TAG = "ACTUATOR";
 
 // Servos usually use 500us to 2500us | 800-2500
 // SERVO TIMINGS
-static const ServoConfig_t config_elevator      = {800, 1650, 2500, false};
+static const ServoConfig_t config_left_elevator  = {800, 1650, 2500, false};
+static const ServoConfig_t config_right_elevator = {800, 1650, 2500, true}; // Reversed
 static const ServoConfig_t config_rudder        = {1000, 1650, 2300, false};
 static const ServoConfig_t config_left_aileron  = {900, 1550, 2400, false};
-static const ServoConfig_t config_right_aileron = {900, 1500, 2400, false}; // Reversed!
+static const ServoConfig_t config_right_aileron = {900, 1500, 2400, false}; // Reversed
 
 // Global handles for comparators
-static mcpwm_cmpr_handle_t cmpr_pitch = NULL;
-static mcpwm_cmpr_handle_t cmpr_yaw = NULL;
+static mcpwm_cmpr_handle_t cmpr_left_elevator = NULL;
+static mcpwm_cmpr_handle_t cmpr_right_elevator = NULL;
+static mcpwm_cmpr_handle_t cmpr_rudder = NULL;
 static mcpwm_cmpr_handle_t cmpr_left_aileron = NULL;
 static mcpwm_cmpr_handle_t cmpr_right_aileron = NULL;
 static mcpwm_cmpr_handle_t cmpr_throttle = NULL;
@@ -115,8 +118,9 @@ void actuators_init(void) {
 
     // Setup 
     // Allocate 2 channels to Group 0 (Tail surfaces)
-    setup_mcpwm_channel(0, timer0, PIN_SERVO_ELEVATOR, &cmpr_pitch, config_elevator.neutral_us);
-    setup_mcpwm_channel(0, timer0, PIN_SERVO_RUDDER, &cmpr_yaw, config_rudder.neutral_us);
+    setup_mcpwm_channel(0, timer0, PIN_SERVO_LEFT_ELEVATOR, &cmpr_left_elevator, config_left_elevator.neutral_us);
+    setup_mcpwm_channel(0, timer0, PIN_SERVO_RIGHT_ELEVATOR, &cmpr_right_elevator, config_right_elevator.neutral_us);
+    setup_mcpwm_channel(0, timer0, PIN_SERVO_RUDDER, &cmpr_rudder, config_rudder.neutral_us);
 
     // Allocate 3 channels to Group 1 (Wing surfaces & Throttle)
     setup_mcpwm_channel(1, timer1, PIN_SERVO_LEFT_AILERON, &cmpr_left_aileron, config_left_aileron.neutral_us);
@@ -136,17 +140,20 @@ void actuators_init(void) {
 }
 
 void actuator_set_pitch(int16_t pitch_raw) {
-    if (cmpr_pitch == NULL) return; // Prevent crash if called too early
+    if (cmpr_left_elevator == NULL || cmpr_right_elevator == NULL) return; // Prevent crash if called too early
 
-    uint32_t pulse = map_value_centered(pitch_raw, -32768, 32767, config_elevator);
-    mcpwm_comparator_set_compare_value(cmpr_pitch, pulse);
+    uint32_t pulse_left = map_value_centered(pitch_raw, -32768, 32767, config_left_elevator);
+    uint32_t pulse_right = map_value_centered(pitch_raw, -32768, 32767, config_right_elevator);
+
+    mcpwm_comparator_set_compare_value(cmpr_left_elevator, pulse_left);
+    mcpwm_comparator_set_compare_value(cmpr_right_elevator, pulse_right);
 }
 
 void actuator_set_yaw(int16_t yaw_raw) {
-    if (cmpr_yaw == NULL) return;
+    if (cmpr_rudder == NULL) return;
 
     uint32_t pulse = map_value_centered(yaw_raw, -32768, 32767, config_rudder);
-    mcpwm_comparator_set_compare_value(cmpr_yaw, pulse);
+    mcpwm_comparator_set_compare_value(cmpr_rudder, pulse);
 }
 
 void actuator_set_roll(int16_t roll_raw) {
