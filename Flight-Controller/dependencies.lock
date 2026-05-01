@@ -92,7 +92,7 @@ dependencies:
   idf:
     source:
       type: idf
-    version: 5.5.3
+    version: 5.5.2
 direct_dependencies:
 - esp-idf-lib/ina3221
 - espressif/esp-now
