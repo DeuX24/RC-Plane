@@ -11,9 +11,19 @@ static const char *TAG = "REMOTE_OTA";
 
 static const char* upload_html = 
     "<html><body><h2>RC Remote OTA Update</h2>"
-    "<form method='POST' action='/update' enctype='multipart/form-data'>"
-    "<input type='file' name='update' accept='.bin'>"
-    "<input type='submit' value='Flash Remote'></form></body></html>";
+    "<input type='file' id='f' accept='.bin'><br><br>"
+    "<button onclick='upload()'>Flash Remote</button>"
+    "<p id='s' style='font-weight:bold;'></p>"
+    "<script>"
+    "function upload() {"
+    "  var file = document.getElementById('f').files[0];"
+    "  if(!file) { alert('Select a .bin file'); return; }"
+    "  document.getElementById('s').innerText = 'Uploading... Please wait.';"
+    "  fetch('/update', { method: 'POST', body: file })"
+    "    .then(response => response.text())"
+    "    .then(text => document.getElementById('s').innerText = text);"
+    "}"
+    "</script></body></html>";
 
 static esp_err_t root_get_handler(httpd_req_t *req) {
     httpd_resp_send(req, upload_html, HTTPD_RESP_USE_STRLEN);
@@ -31,22 +41,28 @@ static esp_err_t update_post_handler(httpd_req_t *req) {
     char buf[1024];
     int remaining = req->content_len;
 
-    while (remaining > 0) {
+    while (remaining > 0) 
+    {
         int recv_len = httpd_req_recv(req, buf, (remaining > sizeof(buf)) ? sizeof(buf) : remaining);
         if (recv_len <= 0) {
             esp_ota_end(ota_handle);
+            httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Receive failed");
             return ESP_FAIL;
         }
         esp_ota_write(ota_handle, buf, recv_len);
         remaining -= recv_len;
     }
 
+    // Check if the firmware was actually valid
     if (esp_ota_end(ota_handle) == ESP_OK) {
         esp_ota_set_boot_partition(update_partition);
         httpd_resp_sendstr(req, "Remote Updated! Rebooting...");
         vTaskDelay(pdMS_TO_TICKS(1000));
         esp_restart();
+    } else {
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "OTA Failed! File is not a valid ESP32 firmware.");
     }
+        
     return ESP_OK;
 }
 

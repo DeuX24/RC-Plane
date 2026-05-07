@@ -9,12 +9,27 @@
 #include "rc_protocol.h"
 #include "actuator_control.h"
 #include "udp_logger.h"
+#include "led_strip.h"
 
 static const char *TAG = "PLANE_MAIN";
+
+#define RGB_LED_GPIO 48
 
 float current_voltage = 12.6f; // Global to store the latest voltage reading
 double total_mah_consumed = 0.0; 
 double total_mwh_consumed = 0.0;
+
+static led_strip_handle_t led_strip;
+
+// --- LINK STATE ---
+static bool link_established = false;
+static uint32_t last_packet_time = 0;
+
+
+void set_rgb(uint32_t r, uint32_t g, uint32_t b) {
+    led_strip_set_pixel(led_strip, 0, r, g, b);
+    led_strip_refresh(led_strip);
+}
 
 // Helper: Maps 9.0V - 13.0V to 0-255 for a 3S LiPo, change this if you use a different battery configuration.
 uint8_t pack_3s_voltage(float voltage) {
@@ -34,6 +49,12 @@ void on_data_recv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int
         for (int i = 1; i < 9; i++) calc ^= data[i];
         
         if (calc == packet.checksum) {
+
+            link_established = true;
+            last_packet_time = esp_log_timestamp();
+
+            set_rgb(0, 50, 0); // Solid Green
+
             // Apply values to actuators
             actuator_set_pitch(packet.pitch);
             actuator_set_yaw(packet.yaw);
@@ -52,7 +73,7 @@ void on_data_recv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int
             // Construct telemetry
             telemetry_packet_t telem = {
                 .header = 0x5A,
-                .voltage = 11.1f, // Placeholder, replace with actual voltage reading
+                .voltage = current_voltage,
                 .pitch = (float)packet.pitch / 364.0f,
                 .roll = (float)packet.roll / 364.0f,
                 .yaw = (float)packet.yaw / 364.0f,
@@ -61,6 +82,18 @@ void on_data_recv(const esp_now_recv_info_t *recv_info, const uint8_t *data, int
             esp_now_send(recv_info->src_addr, (uint8_t *)&telem, sizeof(telem));
         }
     }
+}
+
+void init_rgb() {
+    // Init RGB LED (WS2812)
+    led_strip_config_t strip_config = {
+        .strip_gpio_num = RGB_LED_GPIO,
+        .max_leds = 1,
+    };
+    led_strip_rmt_config_t rmt_config = { .resolution_hz = 10 * 1000 * 1000 };
+    ESP_ERROR_CHECK(led_strip_new_rmt_device(&strip_config, &rmt_config, &led_strip));
+
+    set_rgb(0, 0, 50); // Start with BLUE (Waiting/Booting)
 }
 
 // --- INITIALIZATION FUNCTION ---
@@ -91,7 +124,6 @@ void init_all() {
 
     // Initialize Servos and Motor
     actuators_init();
-    
 }
 
 
@@ -100,8 +132,12 @@ void app_main(void)
 {
     // init_wifi_and_udp_logger("Hos Therese IoT", "S7jodi4n", "192.168.2.96", 3333);
 
+    init_rgb();
+
     // Initialize all hardware peripherals
     init_all();
+
+    set_rgb(50, 40, 0); // Amber (Ready/Idle)
 
     ESP_LOGI(TAG, "Plane Receiver Online via ESP-NOW. Listening for control packets...");
 
@@ -115,6 +151,23 @@ void app_main(void)
 
         // Wait for exactly the remainder of the 100ms cycle
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
+
+        uint32_t now = esp_log_timestamp();
+
+        // --- FAILSAFE CHECK ---
+        // If the link was active, but we haven't received a packet in 1 seconds
+        if (link_established && (now - last_packet_time > 1000)) 
+        {
+            link_established = false;
+            ESP_LOGW(TAG, "CRITICAL: Remote link lost! Entering failsafe.");
+            
+            set_rgb(50, 0, 50); // Solid Purple (Link Lost)
+            
+            // Set actuators to a safe state
+            actuator_set_throttle(0); // Cut motor
+            actuator_set_pitch(0); // Level elevator
+            actuator_set_roll(0);  // Level ailerons
+        }
     }
 
 }

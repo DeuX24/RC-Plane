@@ -16,3 +16,4 @@ dependencies:
   #   public: true
   espressif/esp-now: =*
   esp-idf-lib/ina3221: '*'
+  espressif/led_strip: ^3.0.3

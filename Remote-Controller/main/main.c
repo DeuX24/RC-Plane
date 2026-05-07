@@ -228,7 +228,7 @@ void app_main(void)
     // Check the button state immediately on boot (Active LOW)
     if (gpio_get_level(BUTTON_PIN) == 0) {
         
-        set_rgb(50, 50, 0); // YELLOW = Button detected, waiting for decision
+        set_rgb(50, 50, 50); // WHITE = Button detected, waiting for decision.
         ESP_LOGI("BOOT", "Button held. Determining mode...");
         
         int hold_time = 0;
@@ -257,7 +257,7 @@ void app_main(void)
     // Only initialize ESP-NOW after we have safely bypassed OTA mode
     init_esp_now();
     
-    set_rgb(0, 50, 0); // Solid Green = Ready to fly
+    set_rgb(50, 40, 0); // AMBER = Waiting for connection.
 
     int pitch_raw, yaw_raw;
     int roll_raw, throttle_raw;
