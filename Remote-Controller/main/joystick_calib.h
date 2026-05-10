@@ -6,9 +6,9 @@
 #include "esp_adc/adc_oneshot.h"
 
 #define JOY_PITCH_CHAN      ADC_CHANNEL_9
-#define JOY_YAW_CHAN        ADC_CHANNEL_4
+#define JOY_YAW_CHAN        ADC_CHANNEL_5
 #define JOY_ROLL_CHAN       ADC_CHANNEL_8
-#define JOY_THROTTLE_CHAN   ADC_CHANNEL_5
+#define JOY_THROTTLE_CHAN   ADC_CHANNEL_6
 
 typedef struct {
     int pitch_min, pitch_center, pitch_max;

@@ -48,37 +48,47 @@ int constrain(int val, int min_val, int max_val) {
     return val;
 }
 
-int map_joystick(int raw_val, int min_val, int center_val, int max_val) {
+int map_joystick(int raw_val, int min_val, int center_val, int max_val, bool invert) {
     raw_val = constrain(raw_val, min_val, max_val);
     int diff = raw_val - center_val;
     
     if (abs(diff) < DEADZONE) return 0; 
 
+    int output = 0;
     if (raw_val < center_val) {
         int active_range = center_val - min_val - DEADZONE;
         int active_diff = abs(diff) - DEADZONE;
-        // Check to prevent division by zero
-        if (active_range <= 0) return 0; 
-        return -(active_diff * 32768) / active_range;
+        if (active_range > 0) output = -(active_diff * 32768) / active_range;
     } else {
         int active_range = max_val - center_val - DEADZONE;
         int active_diff = diff - DEADZONE;
-        if (active_range <= 0) return 0;
-        return (active_diff * 32767) / active_range;
+        if (active_range > 0) output = (active_diff * 32767) / active_range;
     }
+    
+    // Flip the sign if the stick is physically upside down
+    return invert ? -output : output;
 }
 
-uint8_t map_throttle_uint8(int raw_val, int min_val, int center_val, int max_val) {
+uint8_t map_throttle_uint8(int raw_val, int min_val, int center_val, int max_val, bool invert) {
     raw_val = constrain(raw_val, min_val, max_val);
-    int diff = raw_val - center_val;
+    
+    if (invert) {
+        // Inverted: pushing UP (throttle increase) LOWERS the raw_val towards min_val.
+        int diff = center_val - raw_val; 
+        if (diff <= DEADZONE) return 0; 
 
-    if (diff <= DEADZONE) return 0; 
+        int active_range = center_val - min_val - DEADZONE;
+        if (active_range <= 0) return 0;
+        return (uint8_t)((diff - DEADZONE) * 255 / active_range);
+    } else {
+        // Standard: pushing UP raises raw_val towards max_val
+        int diff = raw_val - center_val;
+        if (diff <= DEADZONE) return 0; 
 
-    int active_diff = diff - DEADZONE;
-    int active_range = max_val - center_val - DEADZONE;
-    if (active_range <= 0) return 0;
-
-    return (uint8_t)((active_diff * 255) / active_range);
+        int active_range = max_val - center_val - DEADZONE;
+        if (active_range <= 0) return 0;
+        return (uint8_t)((diff - DEADZONE) * 255 / active_range);
+    }
 }
 
 #pragma endregion
@@ -266,7 +276,7 @@ void app_main(void)
     float pitch_smoothed = joy_calib.pitch_center; 
     float yaw_smoothed = joy_calib.yaw_center;
     float roll_smoothed = joy_calib.roll_center;
-    float throttle_smoothed = joy_calib.throttle_min; // Start at min for safety
+    float throttle_smoothed = joy_calib.throttle_center;
 
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(20); // 50Hz Update Rate (Standard for RC)
@@ -292,6 +302,10 @@ void app_main(void)
         adc_oneshot_read(adc1_handle, JOY_ROLL_CHAN, &roll_raw);
         adc_oneshot_read(adc1_handle, JOY_PITCH_CHAN, &pitch_raw);
 
+        //ESP_LOGI("DEBUG", "Yaw: %d | Throttle: %d | Roll: %d | Pitch: %d", yaw_raw, throttle_raw, roll_raw, pitch_raw);
+        //ESP_LOGI("DEBUG", "Smoothed -> Yaw: %.2f | Throttle: %.2f | Roll: %.2f | Pitch: %.2f", yaw_smoothed, throttle_smoothed, roll_smoothed, pitch_smoothed);
+        //ESP_LOGI("DEBUG", "Last Command -> Yaw: %d | Throttle: %d | Roll: %d | Pitch: %d", last_command.yaw, last_command.throttle, last_command.roll, last_command.pitch);
+
         // Apply EMA Filter (0.2 = 20% new reading, 80% old history)
         pitch_smoothed = (0.2 * pitch_raw) + (0.8 * pitch_smoothed);
         yaw_smoothed = (0.2 * yaw_raw) + (0.8 * yaw_smoothed);
@@ -299,13 +313,14 @@ void app_main(void)
         throttle_smoothed = (0.2 * throttle_raw) + (0.8 * throttle_smoothed);
 
         // Map the values using the live NVS calibration data
-        last_command.status = !gpio_get_level(BUTTON_PIN); 
+        //last_command.status = !gpio_get_level(BUTTON_PIN); 
+        last_command.status = 1;
         
-        last_command.pitch = map_joystick((int)pitch_smoothed, joy_calib.pitch_min, joy_calib.pitch_center, joy_calib.pitch_max);
-        last_command.yaw   = map_joystick((int)yaw_smoothed, joy_calib.yaw_min, joy_calib.yaw_center, joy_calib.yaw_max);
-        last_command.roll  = map_joystick((int)roll_smoothed, joy_calib.roll_min, joy_calib.roll_center, joy_calib.roll_max); 
+        last_command.pitch = map_joystick((int)pitch_smoothed, joy_calib.pitch_min, joy_calib.pitch_center, joy_calib.pitch_max, true);
+        last_command.yaw   = map_joystick((int)yaw_smoothed, joy_calib.yaw_min, joy_calib.yaw_center, joy_calib.yaw_max, true);
+        last_command.roll  = map_joystick((int)roll_smoothed, joy_calib.roll_min, joy_calib.roll_center, joy_calib.roll_max, true); 
         
-        last_command.throttle = map_throttle_uint8((int)throttle_smoothed, joy_calib.throttle_min, joy_calib.throttle_center, joy_calib.throttle_max);
+        last_command.throttle = map_throttle_uint8((int)throttle_smoothed, joy_calib.throttle_min, joy_calib.throttle_center, joy_calib.throttle_max, true);
 
         uint8_t *p = (uint8_t*)&last_command;
         last_command.checksum = 0;

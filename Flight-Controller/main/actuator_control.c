@@ -15,8 +15,8 @@ static const char *TAG = "ACTUATOR";
 
 // --- TIMING CONFIGURATION ---
 // ESCs (Motors) usually use 1000us (Off) to 2000us (Max)
-#define ESC_MIN_US       1000
-#define ESC_MAX_US       2000
+#define ESC_MIN_US       1100
+#define ESC_MAX_US       1940
 
 // Servos usually use 500us to 2500us | 800-2500
 // SERVO TIMINGS
@@ -33,7 +33,6 @@ static mcpwm_cmpr_handle_t cmpr_rudder = NULL;
 static mcpwm_cmpr_handle_t cmpr_left_aileron = NULL;
 static mcpwm_cmpr_handle_t cmpr_right_aileron = NULL;
 static mcpwm_cmpr_handle_t cmpr_throttle = NULL;
-
 
 
 // Helper function to map values
@@ -117,7 +116,7 @@ void actuators_init(void) {
     ESP_ERROR_CHECK(mcpwm_new_timer(&timer_config1, &timer1));
 
     // Setup 
-    // Allocate 2 channels to Group 0 (Tail surfaces)
+    // Allocate 3 channels to Group 0 (Tail surfaces)
     setup_mcpwm_channel(0, timer0, PIN_SERVO_LEFT_ELEVATOR, &cmpr_left_elevator, config_left_elevator.neutral_us);
     setup_mcpwm_channel(0, timer0, PIN_SERVO_RIGHT_ELEVATOR, &cmpr_right_elevator, config_right_elevator.neutral_us);
     setup_mcpwm_channel(0, timer0, PIN_SERVO_RUDDER, &cmpr_rudder, config_rudder.neutral_us);
