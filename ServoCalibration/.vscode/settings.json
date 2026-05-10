@@ -1,17 +1,17 @@
 {
-  "C_Cpp.intelliSenseEngine": "default",
-  "idf.extensionActivationMode": "always",
+  "idf.currentSetup": "/home/deux/.espressif/v5.5.3/esp-idf",
+  "idf.flashType": "UART",
   "idf.openOcdConfigs": [
     "board/esp32s3-builtin.cfg"
   ],
-  "idf.currentSetup": "C:\\esp\\v5.5.2\\esp-idf",
   "idf.customExtraVars": {
     "IDF_TARGET": "esp32s3"
   },
-  "clangd.path": "C:\\Espressif\\tools\\esp-clang\\esp-19.1.2_20250312\\esp-clang\\bin\\clangd.exe",
+  "clangd.path": "/home/deux/.espressif/tools/esp-clang/esp-19.1.2_20250312/esp-clang/bin/clangd",
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=c:\\Users\\danni\\Documents\\GitHub\\ESP-IDF\\RC-Plane\\ServoCalibration\\build"
-  ]
+    "--compile-commands-dir=/home/deux/GitHub/RC-Plane/ServoCalibration/build"
+  ],
+  "idf.port": "/dev/ttyACM0"
 }
