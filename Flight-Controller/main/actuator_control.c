@@ -22,7 +22,7 @@ static const char *TAG = "ACTUATOR";
 // SERVO TIMINGS
 static const ServoConfig_t config_left_elevator  = {800, 1411, 2000, true}; // Reversed
 static const ServoConfig_t config_right_elevator = {880, 1443, 2040, false};
-static const ServoConfig_t config_rudder        = {850, 1356, 1870, false};
+static const ServoConfig_t config_rudder        = {850, 1356, 1870, true}; // Reversed
 static const ServoConfig_t config_left_aileron  = {900, 1348, 2100, false};
 static const ServoConfig_t config_right_aileron = {700, 1300, 1850, false};
 
